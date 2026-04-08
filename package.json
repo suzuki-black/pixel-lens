@@ -1,0 +1,13 @@
+{
+  "name": "pixel-lens",
+  "version": "0.1.0",
+  "description": "Lightweight pixel color picker utility for Windows and macOS",
+  "scripts": {
+    "tauri": "npx @tauri-apps/cli",
+    "dev": "npx @tauri-apps/cli dev",
+    "build": "npx @tauri-apps/cli build"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.0.0"
+  }
+}

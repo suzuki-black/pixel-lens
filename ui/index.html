@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="ja" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PixelLens</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- Header -->
+    <header class="app-header">
+      <span class="app-title" data-tauri-drag-region>PixelLens</span>
+      <div class="header-actions">
+        <button class="icon-btn" id="btn-settings" title="設定" aria-label="設定">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+        </button>
+        <button class="icon-btn" id="btn-hide" title="隠す (トレイへ)" aria-label="隠す">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main view -->
+    <main id="view-main" class="view active">
+      <!-- Magnifier -->
+      <section class="magnifier-section">
+        <div class="magnifier-wrapper">
+          <canvas id="magnifier-canvas" width="200" height="200" aria-label="拡大鏡"></canvas>
+          <div class="crosshair"></div>
+        </div>
+        <div class="coords-bar">
+          <span id="coord-display">X: — &nbsp; Y: —</span>
+          <label class="grid-toggle">
+            <input type="checkbox" id="toggle-grid" checked />
+            <span>グリッド</span>
+          </label>
+        </div>
+      </section>
+
+      <!-- Color preview -->
+      <section class="color-preview-section">
+        <div id="color-swatch" class="color-swatch" role="img" aria-label="カラープレビュー"></div>
+        <div class="color-name-block">
+          <span id="color-name" class="color-name">—</span>
+          <span id="color-name-nearest" class="color-name-nearest"></span>
+        </div>
+      </section>
+
+      <!-- Color values -->
+      <section class="color-values-section">
+        <div class="value-row" id="row-hex">
+          <span class="value-label">HEX</span>
+          <span class="value-data" id="val-hex">#——————</span>
+          <button class="copy-btn" data-copy="hex" title="コピー">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+          </button>
+        </div>
+        <div class="value-row" id="row-rgb">
+          <span class="value-label">RGB</span>
+          <span class="value-data" id="val-rgb">— , — , —</span>
+          <button class="copy-btn" data-copy="rgb" title="コピー">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+          </button>
+        </div>
+        <div class="value-row" id="row-name">
+          <span class="value-label">色名</span>
+          <span class="value-data" id="val-name">—</span>
+          <button class="copy-btn" data-copy="name" title="コピー">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+          </button>
+        </div>
+      </section>
+
+      <!-- Permission warning (macOS) -->
+      <div id="permission-warning" class="permission-warning hidden">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/>
+          <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <span>画面収録の権限が必要です。<br>システム環境設定 › プライバシーとセキュリティ › 画面収録 で許可してください。</span>
+      </div>
+    </main>
+
+    <!-- Settings view -->
+    <main id="view-settings" class="view">
+      <div class="settings-header">
+        <button class="icon-btn" id="btn-back" title="戻る">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="15 18 9 12 15 6"/>
+          </svg>
+        </button>
+        <span class="settings-title">設定</span>
+      </div>
+
+      <div class="settings-body">
+        <div class="setting-group">
+          <label class="setting-label">テーマ</label>
+          <div class="segmented" id="theme-selector">
+            <button class="seg-btn active" data-value="dark">ダーク</button>
+            <button class="seg-btn" data-value="light">ライト</button>
+          </div>
+        </div>
+
+        <div class="setting-group">
+          <label class="setting-label">拡大倍率</label>
+          <div class="slider-row">
+            <input type="range" id="zoom-slider" min="4" max="20" value="10" />
+            <span id="zoom-label">10x</span>
+          </div>
+        </div>
+
+        <div class="setting-group">
+          <label class="setting-label">色名辞書</label>
+          <div class="segmented" id="dict-selector">
+            <button class="seg-btn active" data-value="jis">JIS慣用色</button>
+            <button class="seg-btn" data-value="web">Webカラー</button>
+          </div>
+        </div>
+
+        <div class="setting-group">
+          <label class="setting-label">クイックコピー形式 <kbd>Ctrl+Shift+C</kbd></label>
+          <select id="copy-format-select" class="select-input">
+            <option value="hex">HEX 大文字 — #FFFFFF</option>
+            <option value="hex_lower">HEX 小文字 — #ffffff</option>
+            <option value="rgb">RGB CSS — rgb(255, 255, 255)</option>
+            <option value="rgb_raw">RGB 数値 — 255, 255, 255</option>
+            <option value="hsl">HSL CSS — hsl(0, 0%, 100%)</option>
+            <option value="float">Float — 1.000, 1.000, 1.000</option>
+            <option value="hex_0x">0x 記法 — 0xFFFFFF</option>
+            <option value="hex_no_hash">HEX (#なし) — FFFFFF</option>
+            <option value="name">色名 — 白</option>
+          </select>
+        </div>
+
+        <div class="setting-group">
+          <label class="setting-label">ショートカット</label>
+          <input type="text" id="shortcut-input" class="text-input" value="Ctrl+Alt+C" readonly />
+          <span class="setting-hint">クリックして変更（次バージョン対応予定）</span>
+        </div>
+      </div>
+
+      <div class="settings-footer">
+        <button class="btn-primary" id="btn-save-settings">保存</button>
+      </div>
+    </main>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <!-- 診断用インラインスクリプト: 外部ファイルなしでIPCとDOMを確認 -->
+  <script>
+  (function() {
+    var el = document.getElementById('coord-display');
+    if (el) el.textContent = 'INLINE-JS-OK';
+
+    // Tauri注入スクリプトのエラーをコンソールのみに記録（UIを汚染しない）
+    window.addEventListener('error', function(ev) {
+      var src = (ev.filename || '').split('/').pop() || 'injected';
+      console.error('[PixelLens diag] ' + src + ':' + (ev.lineno||'?') + ' ' + ev.message);
+    }, true);
+
+    try {
+      var inv = (window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke)
+        || (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke);
+      if (typeof inv === 'function') {
+        inv('js_log', { level: 'INFO', msg: 'inline-script-ran ipc=OK' });
+      } else {
+        if (el) el.textContent = 'INLINE-OK-NO-IPC';
+      }
+    } catch(e) {
+      if (el) el.textContent = 'INLINE-ERR:' + String(e).substring(0, 40);
+    }
+  })();
+  </script>
+  <script src="app.js?v=8" onerror="document.getElementById('coord-display').textContent='APP-JS-LOAD-ERR'"></script>
+</body>
+</html>

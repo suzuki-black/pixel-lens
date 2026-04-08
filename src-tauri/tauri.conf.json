@@ -1,0 +1,43 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "PixelLens",
+  "version": "0.1.0",
+  "identifier": "dev.pixellens.app",
+  "build": {
+    "devUrl": "http://localhost:8765",
+    "frontendDist": "../ui"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "title": "PixelLens",
+        "width": 340,
+        "height": 520,
+        "minWidth": 300,
+        "minHeight": 460,
+        "resizable": false,
+        "decorations": false,
+        "visible": false,
+        "center": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true
+      }
+    ],
+    "security": {}
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/icon.png",
+      "icons/icon.ico"
+    ],
+    "resources": [],
+    "externalBin": [],
+    "copyright": "",
+    "category": "Utility",
+    "shortDescription": "Pixel color picker utility",
+    "longDescription": "A lightweight pixel color picker that shows RGB, HEX, and Japanese color names for the pixel under your cursor."
+  }
+}

@@ -1,0 +1,22 @@
+# Rust / Cargo
+src-tauri/target/
+
+# Node
+node_modules/
+
+# Tauri
+src-tauri/gen/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+/tmp/
+
+# Build artifacts
+dist/
+
+# Backup files
+ui/app.js.bak

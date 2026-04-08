@@ -20,3 +20,4 @@ dist/
 
 # Backup files
 ui/app.js.bak
+.claude/

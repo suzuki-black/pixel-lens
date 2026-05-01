@@ -14,10 +14,13 @@ macro_rules! log {
     }};
 }
 
-// キャプチャエラーのログを最初の N 回だけ出す
+// キャプチャエラー / カーソルログを最初の N 回だけ出す
 static CAPTURE_ERR_COUNT: std::sync::atomic::AtomicU32 =
     std::sync::atomic::AtomicU32::new(0);
+static CURSOR_ZERO_COUNT: std::sync::atomic::AtomicU32 =
+    std::sync::atomic::AtomicU32::new(0);
 const CAPTURE_ERR_LOG_MAX: u32 = 3;
+const CURSOR_ZERO_LOG_MAX: u32 = 1;
 
 pub struct AppState {
     pub color_dict: Mutex<Vec<ColorEntry>>,
@@ -95,8 +98,17 @@ fn js_log(level: String, msg: String) {
 fn get_cursor_pos() -> Result<cursor::CursorPos, String> {
     let result = cursor::get_cursor_pos();
     match &result {
-        Ok(pos) => log!("get_cursor_pos -> x={} y={}", pos.x, pos.y),
-        Err(e)  => log!("get_cursor_pos ERROR: {}", e),
+        Ok(pos) => {
+            if pos.x == 0 && pos.y == 0 {
+                let n = CURSOR_ZERO_COUNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                if n < CURSOR_ZERO_LOG_MAX {
+                    log!("get_cursor_pos -> x=0 y=0 (以降の (0,0) ログは抑制)");
+                }
+            } else {
+                log!("get_cursor_pos -> x={} y={}", pos.x, pos.y);
+            }
+        }
+        Err(e) => log!("get_cursor_pos ERROR: {}", e),
     }
     result
 }

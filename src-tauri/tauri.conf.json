@@ -24,7 +24,9 @@
         "skipTaskbar": true
       }
     ],
-    "security": {}
+    "security": {
+      "capabilities": ["default"]
+    }
   },
   "bundle": {
     "active": true,

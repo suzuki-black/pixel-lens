@@ -202,6 +202,12 @@ pub fn run() {
                 log!("setup: showing window");
                 let _ = w.show();
                 let _ = w.set_focus();
+                if let Ok(inner) = w.inner_size() {
+                    log!("window inner_size (Tauri): {}x{}", inner.width, inner.height);
+                }
+                if let Ok(outer) = w.outer_size() {
+                    log!("window outer_size (with WM decorations): {}x{}", outer.width, outer.height);
+                }
             }
             log!("setup: done");
             Ok(())

@@ -4,7 +4,6 @@
   "version": "0.2.0",
   "identifier": "dev.pixellens.app",
   "build": {
-    "devUrl": "http://localhost:8765",
     "frontendDist": "../ui"
   },
   "app": {

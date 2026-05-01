@@ -33,6 +33,7 @@ pub struct Settings {
     pub copy_format: String,
     pub theme: String,
     pub show_grid: bool,
+    pub language: String,
 }
 
 impl Default for Settings {
@@ -45,6 +46,38 @@ impl Default for Settings {
             copy_format: "hex".to_string(),
             theme: "dark".to_string(),
             show_grid: true,
+            language: "en".to_string(),
+        }
+    }
+}
+
+// ── Settings persistence ─────────────────────────────────────────────────────
+
+fn settings_path(app: &AppHandle) -> Option<std::path::PathBuf> {
+    app.path().app_data_dir().ok().map(|d| d.join("settings.json"))
+}
+
+fn load_settings_from_disk(app: &tauri::App) -> Settings {
+    let handle = app.handle();
+    if let Some(path) = settings_path(handle) {
+        if let Ok(contents) = std::fs::read_to_string(&path) {
+            if let Ok(s) = serde_json::from_str::<Settings>(&contents) {
+                log!("settings loaded from {:?}", path);
+                return s;
+            }
+        }
+    }
+    Settings::default()
+}
+
+fn save_settings_to_disk(app: &AppHandle, settings: &Settings) {
+    if let Some(path) = settings_path(app) {
+        if let Some(parent) = path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        if let Ok(json) = serde_json::to_string_pretty(settings) {
+            let _ = std::fs::write(&path, json);
+            log!("settings saved to {:?}", path);
         }
     }
 }
@@ -115,7 +148,8 @@ fn get_settings(state: State<AppState>) -> Settings {
 }
 
 #[tauri::command]
-fn save_settings(settings: Settings, state: State<AppState>) -> Result<(), String> {
+fn save_settings(settings: Settings, state: State<AppState>, app_handle: AppHandle) -> Result<(), String> {
+    save_settings_to_disk(&app_handle, &settings);
     *state.settings.lock().unwrap() = settings;
     Ok(())
 }
@@ -143,7 +177,7 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .manage(AppState {
             color_dict: Mutex::new(color_dict),
-            settings: Mutex::new(Settings::default()),
+            settings: Mutex::new(Settings::default()), // overwritten in setup
         })
         .on_page_load(|window, payload| {
             use tauri::webview::PageLoadEvent;
@@ -155,11 +189,15 @@ pub fn run() {
         })
         .setup(|app| {
             log!("setup: begin");
+
+            // Load persisted settings
+            let saved = load_settings_from_disk(app);
+            *app.state::<AppState>().settings.lock().unwrap() = saved;
+
             #[cfg(not(target_os = "linux"))]
             setup_tray(app)?;
             setup_shortcut(app)?;
             log!("setup: shortcut registered");
-            // 開発中は全プラットフォームでウィンドウを即時表示
             if let Some(w) = app.get_webview_window("main") {
                 log!("setup: showing window");
                 let _ = w.show();
@@ -186,14 +224,13 @@ fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     use tauri::menu::{Menu, MenuItem};
     use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 
-    // 右クリックメニューは「終了」のみ。左クリックはウィンドウトグル専用。
     let quit_item = MenuItem::with_id(app, "quit", "PixelLens を終了", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&quit_item])?;
 
     let _tray = TrayIconBuilder::new()
         .icon(app.default_window_icon().unwrap().clone())
         .menu(&menu)
-        .menu_on_left_click(false)   // 左クリックではメニューを出さない
+        .menu_on_left_click(false)
         .tooltip("PixelLens — 左クリックで表示/非表示")
         .on_menu_event(|app, event| match event.id.as_ref() {
             "quit" => app.exit(0),

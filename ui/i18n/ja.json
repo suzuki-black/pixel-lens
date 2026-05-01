@@ -1,0 +1,22 @@
+{
+  "settings": "設定",
+  "hide": "トレイへ",
+  "back": "戻る",
+  "save": "保存",
+  "theme": "テーマ",
+  "dark": "ダーク",
+  "light": "ライト",
+  "zoom": "拡大倍率",
+  "dictionary": "色名辞書",
+  "jis": "JIS慣用色",
+  "web": "Webカラー",
+  "language": "言語",
+  "quickCopyFormat": "クイックコピー形式",
+  "shortcut": "ショートカット",
+  "shortcutHint": "クリックして変更（次バージョン対応予定）",
+  "gridTooltip": "グリッド表示",
+  "copySuccess": "コピー: ",
+  "copyFail": "コピー失敗",
+  "settingsSaved": "設定を保存しました",
+  "settingsFailed": "保存に失敗しました"
+}

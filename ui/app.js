@@ -2,11 +2,84 @@
 
 (function () {
 
-// ── 診断ログ（Rust側に送れる場合は送り、常にconsole.logにも出す）────────────
+// ── i18n ─────────────────────────────────────────────────────────────────────
+const I18N = {
+  en: {
+    settings:        'Settings',
+    hide:            'Hide to tray',
+    back:            'Back',
+    save:            'Save',
+    theme:           'Theme',
+    dark:            'Dark',
+    light:           'Light',
+    zoom:            'Zoom',
+    dictionary:      'Color Dictionary',
+    jis:             'JIS',
+    web:             'Web',
+    language:        'Language',
+    quickCopyFormat: 'Quick Copy Format',
+    shortcut:        'Shortcut',
+    shortcutHint:    'Customization coming in next version',
+    gridTooltip:     'Toggle grid',
+    copySuccess:     'Copied: ',
+    copyFail:        'Copy failed',
+    settingsSaved:   'Settings saved',
+    settingsFailed:  'Failed to save',
+    permWarning:     'Screen recording permission required. Go to System Preferences › Privacy & Security › Screen Recording.',
+  },
+  ja: {
+    settings:        '設定',
+    hide:            'トレイへ',
+    back:            '戻る',
+    save:            '保存',
+    theme:           'テーマ',
+    dark:            'ダーク',
+    light:           'ライト',
+    zoom:            '拡大倍率',
+    dictionary:      '色名辞書',
+    jis:             'JIS慣用色',
+    web:             'Webカラー',
+    language:        '言語',
+    quickCopyFormat: 'クイックコピー形式',
+    shortcut:        'ショートカット',
+    shortcutHint:    'クリックして変更（次バージョン対応予定）',
+    gridTooltip:     'グリッド表示',
+    copySuccess:     'コピー: ',
+    copyFail:        'コピー失敗',
+    settingsSaved:   '設定を保存しました',
+    settingsFailed:  '保存に失敗しました',
+    permWarning:     '画面収録の権限が必要です。システム環境設定 › プライバシーとセキュリティ › 画面収録 で許可してください。',
+  },
+};
+
+function t(key) {
+  const lang = state.settings.language || 'en';
+  return (I18N[lang] || I18N.en)[key] || key;
+}
+
+function applyI18n() {
+  // Text content
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    el.textContent = t(el.dataset.i18n);
+  });
+  // title attributes
+  document.querySelectorAll('[data-i18n-title]').forEach(el => {
+    el.title = t(el.dataset.i18nTitle);
+  });
+  // Grid button tooltip
+  const gridBtn = document.getElementById('btn-toggle-grid');
+  if (gridBtn) gridBtn.title = t('gridTooltip');
+  // Permission warning text
+  const permText = document.getElementById('permission-warning-text');
+  if (permText) permText.textContent = t('permWarning');
+  // html lang attribute
+  document.documentElement.lang = state.settings.language || 'en';
+}
+
+// ── Diagnostics ───────────────────────────────────────────────────────────────
 function diag(msg) {
   const text = '[JS] ' + msg;
   console.log(text);
-  // Rust側へ転送（IPC利用可能なら）
   try {
     const _invoke = window.__TAURI_INTERNALS__?.invoke
       || window.__TAURI__?.core?.invoke;
@@ -16,7 +89,6 @@ function diag(msg) {
   } catch (_) {}
 }
 
-// ── 診断：エラー捕捉（コンソールのみ、UIは汚染しない）────────────────────
 window.addEventListener('unhandledrejection', (e) => {
   diag('unhandledrejection: ' + String(e.reason));
 });
@@ -25,7 +97,7 @@ diag('script-start');
 document.getElementById('coord-display').textContent = 'app.js-loaded';
 diag('coord-display set');
 
-// ── Tauri bridge (graceful fallback for browser preview) ────────────────────
+// ── Tauri bridge ──────────────────────────────────────────────────────────────
 diag('__TAURI__ type=' + typeof window.__TAURI__);
 diag('__TAURI_INTERNALS__ type=' + typeof window.__TAURI_INTERNALS__);
 
@@ -42,7 +114,7 @@ const writeText = isTauri
   ? (text) => window.__TAURI__['clipboard-manager'].writeText(text)
   : (text) => navigator.clipboard.writeText(text);
 
-// ── Color format conversion ──────────────────────────────────────────────────
+// ── Color format conversion ───────────────────────────────────────────────────
 function rgbToHsl(r, g, b) {
   r /= 255; g /= 255; b /= 255;
   const max = Math.max(r, g, b), min = Math.min(r, g, b);
@@ -60,9 +132,10 @@ function rgbToHsl(r, g, b) {
 }
 
 function formatColor(color, fmt) {
-  const { r, g, b, hex, nearest_name } = color;
+  const { r, g, b, hex, nearest_name, nearest_en } = color;
   const hexUp = hex.replace('#', '').toUpperCase();
   const [h, s, l] = rgbToHsl(r, g, b);
+  const name = (state.settings.language === 'en') ? nearest_en : nearest_name;
   switch (fmt) {
     case 'hex':         return `#${hexUp}`;
     case 'hex_lower':   return hex.toLowerCase();
@@ -72,12 +145,12 @@ function formatColor(color, fmt) {
     case 'float':       return `${(r/255).toFixed(3)}, ${(g/255).toFixed(3)}, ${(b/255).toFixed(3)}`;
     case 'hex_0x':      return `0x${hexUp}`;
     case 'hex_no_hash': return hexUp;
-    case 'name':        return nearest_name;
+    case 'name':        return name;
     default:            return `#${hexUp}`;
   }
 }
 
-/** Mock responses for browser preview / development */
+// ── Mock for browser preview ──────────────────────────────────────────────────
 async function mockInvoke(cmd, args) {
   if (cmd === 'get_cursor_pos') return { x: 640, y: 400 };
   if (cmd === 'capture_area') {
@@ -89,100 +162,104 @@ async function mockInvoke(cmd, args) {
         r: 74, g: 144, b: 226,
         hex: '#4A90E2',
         nearest_name: '空色',
-        nearest_hex: '#4A90E2',
-        delta_e: 0.0,
+        nearest_romaji: 'Sora-iro',
+        nearest_en: 'Sky Blue',
+        nearest_hex: '#4A90D9',
+        delta_e: 1.2,
       },
       cursor_x: 640,
       cursor_y: 400,
     };
   }
   if (cmd === 'get_settings') {
-    return { zoom_level: 10, use_jis_colors: true, shortcut: 'Ctrl+Alt+C', copy_shortcut: 'Ctrl+Shift+C', copy_format: 'hex', theme: 'dark', show_grid: true };
+    return {
+      zoom_level: 10, use_jis_colors: true,
+      shortcut: 'Ctrl+Alt+C', copy_shortcut: 'Ctrl+Shift+C',
+      copy_format: 'hex', theme: 'dark', show_grid: true, language: 'en',
+    };
   }
   if (cmd === 'save_settings') return null;
   return null;
 }
 
-// ── State ────────────────────────────────────────────────────────────────────
+// ── State ─────────────────────────────────────────────────────────────────────
 const state = {
   running: false,
   rafId: null,
-  currentColor: { r: 0, g: 0, b: 0, hex: '#000000', nearest_name: '—', nearest_hex: '#000000' },
-  settings: { zoom_level: 10, use_jis_colors: true, shortcut: 'Ctrl+Alt+C', copy_shortcut: 'Ctrl+Shift+C', copy_format: 'hex', theme: 'dark', show_grid: true },
+  currentColor: {
+    r: 0, g: 0, b: 0,
+    hex: '#000000',
+    nearest_name: '—', nearest_romaji: '—', nearest_en: '—',
+    nearest_hex: '#000000', delta_e: 0,
+  },
+  settings: {
+    zoom_level: 10, use_jis_colors: true,
+    shortcut: 'Ctrl+Alt+C', copy_shortcut: 'Ctrl+Shift+C',
+    copy_format: 'hex', theme: 'dark', show_grid: true, language: 'en',
+  },
   permissionError: false,
 };
 
-// ── DOM refs ─────────────────────────────────────────────────────────────────
-const canvas = document.getElementById('magnifier-canvas');
-const ctx = canvas.getContext('2d');
+// ── DOM refs ──────────────────────────────────────────────────────────────────
+const canvas       = document.getElementById('magnifier-canvas');
+const ctx          = canvas.getContext('2d');
 const coordDisplay = document.getElementById('coord-display');
-const colorSwatch = document.getElementById('color-swatch');
-const colorName = document.getElementById('color-name');
-const colorNameNearest = document.getElementById('color-name-nearest');
-const valHex = document.getElementById('val-hex');
-const valRgb = document.getElementById('val-rgb');
-const valName = document.getElementById('val-name');
-const toast = document.getElementById('toast');
-const permissionWarning = document.getElementById('permission-warning');
-const toggleGrid = document.getElementById('toggle-grid');
+const colorSwatch  = document.getElementById('color-swatch');
+const colorName    = document.getElementById('color-name');
+const colorNameSub = document.getElementById('color-name-sub');
+const valCombined  = document.getElementById('val-combined');
+const toast        = document.getElementById('toast');
+const permWarn     = document.getElementById('permission-warning');
+const gridBtn      = document.getElementById('btn-toggle-grid');
 
-// ── Magnifier rendering ──────────────────────────────────────────────────────
-const CANVAS_SIZE = 200; // px canvas dimension
-const CAPTURE_PX = 21;   // pixels to capture (odd number for center alignment)
+// ── Magnifier rendering ───────────────────────────────────────────────────────
+const CANVAS_SIZE = 200;
+const CAPTURE_PX  = 21;
 
-let lastImageData = null;
-
-let tickCount = 0;
+let tickCount        = 0;
 let captureFailCount = 0;
-const CAPTURE_FAIL_MAX = 5; // これを超えたら低速ポーリングに切替
+const CAPTURE_FAIL_MAX = 5;
 
 async function tick() {
   if (!state.running) return;
 
   try {
-    // 最初の3回だけ詳細ログ
-    if (tickCount < 3) {
-      diag('tick#' + tickCount + ' invoke=' + (isTauri ? 'tauri' : 'mock'));
-    }
+    if (tickCount < 3) diag('tick#' + tickCount);
     tickCount++;
 
     const pos = await invoke('get_cursor_pos');
-    if (tickCount <= 3) diag('get_cursor_pos OK x=' + pos.x + ' y=' + pos.y);
     coordDisplay.textContent = `X: ${pos.x}  Y: ${pos.y}`;
 
-    const size = CAPTURE_PX;
-    const data = await invoke('capture_area', { cx: pos.x, cy: pos.y, size });
-    if (tickCount <= 3) diag('capture_area OK hex=' + (data.color?.hex ?? '?'));
+    const data = await invoke('capture_area', { cx: pos.x, cy: pos.y, size: CAPTURE_PX });
 
     if (data.image_b64) {
       const img = await loadImage(`data:image/png;base64,${data.image_b64}`);
-      renderMagnifier(img, size);
+      renderMagnifier(img, CAPTURE_PX);
     } else {
-      // Browser preview: draw placeholder
       renderPlaceholder(pos.x, pos.y);
     }
 
     updateColorDisplay(data.color);
-    permissionWarning.classList.add('hidden');
+    permWarn.classList.add('hidden');
     state.permissionError = false;
-    captureFailCount = 0; // 成功したらリセット
+    captureFailCount = 0;
+
   } catch (err) {
     const msg = String(err);
     console.error('[PixelLens tick error]', msg);
-
     captureFailCount++;
+
     if (captureFailCount >= CAPTURE_FAIL_MAX) {
-      // 連続失敗: 低速ポーリングに切替（ログスパム防止）
       coordDisplay.textContent = 'Screen capture N/A (WSL2?)';
       setTimeout(tick, 2000);
       return;
     }
 
-    coordDisplay.textContent = `Error: ${msg.substring(0, 80)}`;
+    coordDisplay.textContent = `Error: ${msg.substring(0, 60)}`;
     if (msg.includes('permission') || msg.includes('CGDisplay') || msg.includes('access')) {
       if (!state.permissionError) {
         state.permissionError = true;
-        permissionWarning.classList.remove('hidden');
+        permWarn.classList.remove('hidden');
       }
     }
   }
@@ -201,14 +278,10 @@ function loadImage(src) {
 
 function renderMagnifier(img, capturedPx) {
   ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-
-  const zoom = CANVAS_SIZE / capturedPx;
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(img, 0, 0, capturedPx, capturedPx, 0, 0, CANVAS_SIZE, CANVAS_SIZE);
-
-  if (state.settings.show_grid && zoom >= 6) {
-    drawGrid(zoom, capturedPx);
-  }
+  const zoom = CANVAS_SIZE / capturedPx;
+  if (state.settings.show_grid && zoom >= 6) drawGrid(zoom, capturedPx);
 }
 
 function drawGrid(cellSize, count) {
@@ -216,21 +289,15 @@ function drawGrid(cellSize, count) {
   ctx.lineWidth = 0.5;
   for (let i = 1; i < count; i++) {
     const x = i * cellSize;
-    ctx.beginPath();
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x, CANVAS_SIZE);
-    ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, CANVAS_SIZE); ctx.stroke();
     const y = i * cellSize;
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(CANVAS_SIZE, y);
-    ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(CANVAS_SIZE, y); ctx.stroke();
   }
 }
 
 function renderPlaceholder(cx, cy) {
-  // Browser preview: checkerboard + label
-  ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--bg-elevated').trim() || '#313139';
+  ctx.fillStyle = getComputedStyle(document.documentElement)
+    .getPropertyValue('--bg-elevated').trim() || '#313139';
   ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
   ctx.fillStyle = 'rgba(255,255,255,0.1)';
   const cell = 20;
@@ -239,68 +306,70 @@ function renderPlaceholder(cx, cy) {
       if ((r + c) % 2 === 0) ctx.fillRect(c * cell, r * cell, cell, cell);
     }
   }
-  ctx.fillStyle = 'rgba(255,255,255,0.4)';
-  ctx.font = '11px sans-serif';
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  ctx.font = '10px sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText('拡大鏡 (Tauriで動作)', CANVAS_SIZE / 2, CANVAS_SIZE / 2);
+  ctx.fillText('Magnifier (Tauri only)', CANVAS_SIZE / 2, CANVAS_SIZE / 2);
 }
 
+// ── Color display ─────────────────────────────────────────────────────────────
 function updateColorDisplay(color) {
   state.currentColor = color;
   colorSwatch.style.backgroundColor = color.hex;
-  colorName.textContent = color.nearest_name;
-  colorNameNearest.textContent = color.delta_e > 0.5
-    ? `近似 ΔE ${color.delta_e.toFixed(1)}`
-    : '';
-  valHex.textContent = color.hex;
-  valRgb.textContent = `${color.r}, ${color.g}, ${color.b}`;
-  valName.textContent = color.nearest_name;
+
+  const lang = state.settings.language || 'en';
+
+  if (lang === 'en') {
+    // 3-axis: Romaji / Japanese / English
+    colorName.textContent = `${color.nearest_romaji} / ${color.nearest_name} / ${color.nearest_en}`;
+    colorNameSub.textContent = color.delta_e > 0.5 ? `ΔE ${color.delta_e.toFixed(1)}` : '';
+  } else {
+    // JA: Japanese name with inline ΔE
+    const de = color.delta_e > 0.5 ? `（ΔE ${color.delta_e.toFixed(1)}）` : '';
+    colorName.textContent = `${color.nearest_name}${de}`;
+    colorNameSub.textContent = '';
+  }
+
+  // Consolidated value row
+  const nameLabel = lang === 'en' ? color.nearest_en : color.nearest_name;
+  valCombined.textContent = `${color.hex}  |  ${color.r}, ${color.g}, ${color.b}  |  ${nameLabel}`;
 }
 
-// ── Quick copy (shortcut / global event) ─────────────────────────────────────
+// ── Quick copy ────────────────────────────────────────────────────────────────
 async function quickCopy() {
   const text = formatColor(state.currentColor, state.settings.copy_format);
   try {
     await writeText(text);
-    showToast(`コピー: ${text}`);
+    showToast(t('copySuccess') + text);
+    const btn = document.getElementById('btn-copy-main');
+    if (btn) { btn.classList.add('copied'); setTimeout(() => btn.classList.remove('copied'), 1200); }
   } catch (e) {
-    showToast('コピー失敗');
+    showToast(t('copyFail'));
   }
 }
 
-// ── Hide button (タイトルバーなし時のウィンドウ隠しボタン) ──────────────────
+// ── Grid toggle (icon button) ─────────────────────────────────────────────────
+gridBtn.addEventListener('click', () => {
+  state.settings.show_grid = !state.settings.show_grid;
+  gridBtn.setAttribute('aria-pressed', String(state.settings.show_grid));
+  gridBtn.classList.toggle('active', state.settings.show_grid);
+});
+
+// ── Hide button ───────────────────────────────────────────────────────────────
 document.getElementById('btn-hide').addEventListener('click', () => {
   invoke('hide_window').catch(() => {});
 });
 
-// Tauri global shortcut イベント (Ctrl+Shift+C) をリッスン
+// ── Copy button ───────────────────────────────────────────────────────────────
+document.getElementById('btn-copy-main').addEventListener('click', () => quickCopy());
+
+// ── Global shortcut event (Ctrl+Shift+C) ─────────────────────────────────────
 if (isTauri && window.__TAURI__?.event?.listen) {
   window.__TAURI__.event.listen('quick-copy', () => quickCopy());
 }
 
-// ── Copy ─────────────────────────────────────────────────────────────────────
-document.querySelectorAll('.copy-btn').forEach(btn => {
-  btn.addEventListener('click', async () => {
-    const type = btn.dataset.copy;
-    let text = '';
-    if (type === 'hex') text = state.currentColor.hex;
-    else if (type === 'rgb') text = `rgb(${state.currentColor.r}, ${state.currentColor.g}, ${state.currentColor.b})`;
-    else if (type === 'name') text = state.currentColor.nearest_name;
-
-    try {
-      await writeText(text);
-      btn.classList.add('copied');
-      setTimeout(() => btn.classList.remove('copied'), 1200);
-      showToast(`「${text}」をコピーしました`);
-    } catch (e) {
-      showToast('コピーに失敗しました');
-    }
-  });
-});
-
 // ── Toast ─────────────────────────────────────────────────────────────────────
 let toastTimer = null;
-
 function showToast(msg) {
   toast.textContent = msg;
   toast.classList.add('visible');
@@ -309,7 +378,7 @@ function showToast(msg) {
 }
 
 // ── Navigation ────────────────────────────────────────────────────────────────
-const viewMain = document.getElementById('view-main');
+const viewMain     = document.getElementById('view-main');
 const viewSettings = document.getElementById('view-settings');
 
 document.getElementById('btn-settings').addEventListener('click', () => {
@@ -324,10 +393,10 @@ document.getElementById('btn-back').addEventListener('click', () => {
 });
 
 // ── Settings UI ───────────────────────────────────────────────────────────────
-const zoomSlider = document.getElementById('zoom-slider');
-const zoomLabel = document.getElementById('zoom-label');
-const shortcutInput = document.getElementById('shortcut-input');
-const copyFormatSelect = document.getElementById('copy-format-select');
+const zoomSlider      = document.getElementById('zoom-slider');
+const zoomLabel       = document.getElementById('zoom-label');
+const shortcutInput   = document.getElementById('shortcut-input');
+const copyFormatSelect= document.getElementById('copy-format-select');
 
 zoomSlider.addEventListener('input', () => {
   zoomLabel.textContent = `${zoomSlider.value}x`;
@@ -335,6 +404,7 @@ zoomSlider.addEventListener('input', () => {
 
 function setupSegmented(containerId, onChange) {
   const container = document.getElementById(containerId);
+  if (!container) return;
   container.querySelectorAll('.seg-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       container.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('active'));
@@ -345,10 +415,12 @@ function setupSegmented(containerId, onChange) {
 }
 
 let pendingTheme = state.settings.theme;
-let pendingDict = state.settings.use_jis_colors ? 'jis' : 'web';
+let pendingDict  = state.settings.use_jis_colors ? 'jis' : 'web';
+let pendingLang  = state.settings.language;
 
 setupSegmented('theme-selector', (val) => { pendingTheme = val; });
-setupSegmented('dict-selector', (val) => { pendingDict = val; });
+setupSegmented('dict-selector',  (val) => { pendingDict  = val; });
+setupSegmented('lang-selector',  (val) => { pendingLang  = val; });
 
 function loadSettingsUI() {
   const s = state.settings;
@@ -358,14 +430,17 @@ function loadSettingsUI() {
   copyFormatSelect.value = s.copy_format || 'hex';
 
   pendingTheme = s.theme;
-  pendingDict = s.use_jis_colors ? 'jis' : 'web';
+  pendingDict  = s.use_jis_colors ? 'jis' : 'web';
+  pendingLang  = s.language || 'en';
 
   setActiveSegBtn('theme-selector', s.theme);
-  setActiveSegBtn('dict-selector', s.use_jis_colors ? 'jis' : 'web');
+  setActiveSegBtn('dict-selector',  s.use_jis_colors ? 'jis' : 'web');
+  setActiveSegBtn('lang-selector',  s.language || 'en');
 }
 
 function setActiveSegBtn(containerId, value) {
   const container = document.getElementById(containerId);
+  if (!container) return;
   container.querySelectorAll('.seg-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.value === value);
   });
@@ -373,25 +448,27 @@ function setActiveSegBtn(containerId, value) {
 
 document.getElementById('btn-save-settings').addEventListener('click', async () => {
   const newSettings = {
-    zoom_level: parseInt(zoomSlider.value, 10),
+    zoom_level:     parseInt(zoomSlider.value, 10),
     use_jis_colors: pendingDict === 'jis',
-    shortcut: shortcutInput.value,
-    theme: pendingTheme,
-    show_grid: state.settings.show_grid,
+    shortcut:       shortcutInput.value,
+    theme:          pendingTheme,
+    show_grid:      state.settings.show_grid,
+    copy_format:    copyFormatSelect.value,
+    copy_shortcut:  state.settings.copy_shortcut,
+    language:       pendingLang,
   };
-
-  newSettings.copy_format = copyFormatSelect.value;
-  newSettings.copy_shortcut = state.settings.copy_shortcut;
 
   try {
     await invoke('save_settings', { settings: newSettings });
     state.settings = newSettings;
     applyTheme(newSettings.theme);
-    showToast('設定を保存しました');
+    applyI18n();
+    updateColorDisplay(state.currentColor); // re-render with new language
+    showToast(t('settingsSaved'));
     viewSettings.classList.remove('active');
     viewMain.classList.add('active');
   } catch (e) {
-    showToast('保存に失敗しました');
+    showToast(t('settingsFailed'));
   }
 });
 
@@ -399,23 +476,20 @@ function applyTheme(theme) {
   document.documentElement.setAttribute('data-theme', theme);
 }
 
-// ── Grid toggle ────────────────────────────────────────────────────────────────
-toggleGrid.addEventListener('change', () => {
-  state.settings.show_grid = toggleGrid.checked;
-});
-
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
   diag('init: start');
   try {
     const s = await invoke('get_settings');
-    diag('init: get_settings OK theme=' + s.theme);
+    diag('init: get_settings OK theme=' + s.theme + ' lang=' + s.language);
     state.settings = s;
-    toggleGrid.checked = s.show_grid;
+    gridBtn.setAttribute('aria-pressed', String(s.show_grid));
+    gridBtn.classList.toggle('active', s.show_grid);
     applyTheme(s.theme);
+    applyI18n();
   } catch (e) {
     diag('init: get_settings FAILED: ' + String(e));
-    // Use defaults
+    applyI18n(); // apply defaults
   }
 
   diag('init: starting tick loop');

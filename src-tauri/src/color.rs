@@ -6,21 +6,25 @@ pub struct ColorInfo {
     pub g: u8,
     pub b: u8,
     pub hex: String,
-    pub nearest_name: String,
+    pub nearest_name: String,    // Japanese name (backward compat)
+    pub nearest_romaji: String,
+    pub nearest_en: String,
     pub nearest_hex: String,
     pub delta_e: f64,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct ColorEntry {
-    pub name: String,
     pub hex: String,
+    pub ja: String,
+    pub romaji: String,
+    pub en: String,
 }
 
 impl ColorInfo {
     pub fn from_rgb(r: u8, g: u8, b: u8, dictionary: &[ColorEntry]) -> Self {
         let hex = format!("#{:02X}{:02X}{:02X}", r, g, b);
-        let (nearest_name, nearest_hex, delta_e) =
+        let (nearest_name, nearest_romaji, nearest_en, nearest_hex, delta_e) =
             find_nearest_color(r, g, b, dictionary);
         ColorInfo {
             r,
@@ -28,6 +32,8 @@ impl ColorInfo {
             b,
             hex,
             nearest_name,
+            nearest_romaji,
+            nearest_en,
             nearest_hex,
             delta_e,
         }
@@ -93,23 +99,27 @@ fn hex_to_rgb(hex: &str) -> Option<(u8, u8, u8)> {
     Some((r, g, b))
 }
 
-fn find_nearest_color(r: u8, g: u8, b: u8, dict: &[ColorEntry]) -> (String, String, f64) {
-    let mut best_name = "Unknown".to_string();
-    let mut best_hex = format!("#{:02X}{:02X}{:02X}", r, g, b);
-    let mut best_de = f64::MAX;
+fn find_nearest_color(r: u8, g: u8, b: u8, dict: &[ColorEntry]) -> (String, String, String, String, f64) {
+    let mut best_name    = "Unknown".to_string();
+    let mut best_romaji  = "Unknown".to_string();
+    let mut best_en      = "Unknown".to_string();
+    let mut best_hex     = format!("#{:02X}{:02X}{:02X}", r, g, b);
+    let mut best_de      = f64::MAX;
 
     for entry in dict {
         if let Some((er, eg, eb)) = hex_to_rgb(&entry.hex) {
             let de = delta_e_cie76(r, g, b, er, eg, eb);
             if de < best_de {
-                best_de = de;
-                best_name = entry.name.clone();
-                best_hex = entry.hex.clone();
+                best_de      = de;
+                best_name    = entry.ja.clone();
+                best_romaji  = entry.romaji.clone();
+                best_en      = entry.en.clone();
+                best_hex     = entry.hex.clone();
             }
         }
     }
 
-    (best_name, best_hex, best_de)
+    (best_name, best_romaji, best_en, best_hex, best_de)
 }
 
 /// Load the color dictionary from the bundled JSON file.

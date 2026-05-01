@@ -1,0 +1,22 @@
+{
+  "settings": "Settings",
+  "hide": "Hide to tray",
+  "back": "Back",
+  "save": "Save",
+  "theme": "Theme",
+  "dark": "Dark",
+  "light": "Light",
+  "zoom": "Zoom",
+  "dictionary": "Color Dictionary",
+  "jis": "JIS",
+  "web": "Web",
+  "language": "Language",
+  "quickCopyFormat": "Quick Copy Format",
+  "shortcut": "Shortcut",
+  "shortcutHint": "Customization coming in next version",
+  "gridTooltip": "Toggle grid",
+  "copySuccess": "Copied: ",
+  "copyFail": "Copy failed",
+  "settingsSaved": "Settings saved",
+  "settingsFailed": "Failed to save"
+}

@@ -12,9 +12,9 @@
       {
         "title": "PixelLens",
         "width": 300,
-        "height": 460,
+        "height": 390,
         "minWidth": 280,
-        "minHeight": 440,
+        "minHeight": 370,
         "resizable": false,
         "decorations": false,
         "visible": false,

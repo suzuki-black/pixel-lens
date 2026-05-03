@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Required since macOS 14 (Sonoma) for ScreenCaptureKit APIs -->
+    <key>NSScreenCaptureUsageDescription</key>
+    <string>PixelLens needs screen recording access to show you the pixel color under your cursor.</string>
+</dict>
+</plist>

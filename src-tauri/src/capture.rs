@@ -15,12 +15,18 @@ pub struct CaptureResult {
 }
 
 /// Capture a square region of `size` pixels centered on (cx, cy).
-pub fn capture_area(cx: i32, cy: i32, size: u32) -> Result<CaptureResult, String> {
+///
+/// `exclude_window_id` — macOS CGWindowID of our own window.
+///   * `> 0` : cursor is **outside** the PixelLens window → exclude PixelLens
+///             from the capture so it doesn't obscure content behind it.
+///   * `0`   : cursor is **inside** the PixelLens window → include all windows
+///             so the caller can sample PixelLens's own colors.
+pub fn capture_area(cx: i32, cy: i32, size: u32, exclude_window_id: u32) -> Result<CaptureResult, String> {
     let half = (size / 2) as i32;
     let left = cx - half;
     let top = cy - half;
 
-    let pixels = capture_screen_region(left, top, size, size)?;
+    let pixels = capture_screen_region(left, top, size, size, exclude_window_id)?;
 
     // Encode to PNG base64
     let img: ImageBuffer<Rgba<u8>, Vec<u8>> =
@@ -66,7 +72,7 @@ pub fn capture_area(cx: i32, cy: i32, size: u32) -> Result<CaptureResult, String
 // ── Platform implementations ────────────────────────────────────────────────
 
 #[cfg(target_os = "windows")]
-fn capture_screen_region(x: i32, y: i32, w: u32, h: u32) -> Result<Vec<u8>, String> {
+fn capture_screen_region(x: i32, y: i32, w: u32, h: u32, _exclude_window_id: u32) -> Result<Vec<u8>, String> {
     use windows::Win32::Graphics::Gdi::{
         BitBlt, CreateCompatibleBitmap, CreateCompatibleDC, DeleteDC, DeleteObject,
         GetDIBits, GetDC, ReleaseDC, SelectObject, BITMAPINFO,
@@ -131,34 +137,124 @@ fn capture_screen_region(x: i32, y: i32, w: u32, h: u32) -> Result<Vec<u8>, Stri
     }
 }
 
+// ── macOS ─────────────────────────────────────────────────────────────────────
+// Screen capture on macOS uses ScreenCaptureKit (SCKit).
+// On macOS 26, SCKit requires authorization via SCContentSharingPicker.
+// Call sc_show_picker() once (e.g. via tray menu) to present the picker;
+// after the user selects a display, captures succeed via SCKit.
+//
+// CGWindowListCreateImage was removed: it is unavailable in the macOS 26 SDK
+// and only returned the desktop wallpaper (old TCC service cannot be granted).
+//
+// The ObjC shim in capture_helper.m implements the capture logic and is
+// compiled by build.rs via the `cc` crate.
+
 #[cfg(target_os = "macos")]
-fn capture_screen_region(x: i32, y: i32, w: u32, h: u32) -> Result<Vec<u8>, String> {
-    use core_graphics::display::{CGDisplay, CGRect, CGPoint, CGSize};
-    use core_graphics::image::CGImage;
+pub mod macos_ffi {
+    #[link(name = "CoreGraphics", kind = "framework")]
+    extern "C" {
+        /// Returns true if the caller has the OLD screen-recording TCC permission.
+        /// NOTE: On macOS 26, System Settings controls a DIFFERENT service,
+        /// so this always returns false regardless of user settings.
+        /// Used for diagnostic logging only.
+        pub fn CGPreflightScreenCaptureAccess() -> bool;
+    }
+}
 
-    let rect = CGRect::new(
-        &CGPoint::new(x as f64, y as f64),
-        &CGSize::new(w as f64, h as f64),
-    );
-    let image: CGImage = CGDisplay::screenshot(rect, 0, 0, 0)
-        .ok_or("CGDisplay::screenshot failed")?;
+// FFI declarations for capture_helper.m (compiled by build.rs via `cc` crate).
+#[cfg(target_os = "macos")]
+extern "C" {
+    /// Capture `rect` (logical coords) via ScreenCaptureKit (primary) or
+    /// CGWindowListCreateImage (fallback).
+    /// exclude_win_id: CGWindowID of PixelLens own window (> 0) to exclude it
+    ///   from the composite, or 0 to include all windows.
+    /// Returns a malloc'd RGBA buffer of size (*out_w * *out_h * 4), or NULL.
+    fn sc_capture_rect_rgba(
+        x: f64, y: f64, w: f64, h: f64,
+        exclude_win_id: u32,
+        out_w: *mut u32,
+        out_h: *mut u32,
+    ) -> *mut u8;
 
-    let width = image.width();
-    let height = image.height();
-    let data = image.data();
-    let bytes = data.bytes();
+    /// Free a buffer returned by sc_capture_rect_rgba.
+    fn sc_free_buffer(buf: *mut u8);
 
-    // macOS returns BGRA; convert to RGBA
-    let mut buf: Vec<u8> = bytes.to_vec();
-    for chunk in buf.chunks_exact_mut(4) {
-        chunk.swap(0, 2);
+    /// Present SCContentSharingPicker so the user can authorize screen capture.
+    /// On macOS 26, this is the ONLY way to get TCC authorization for SCKit.
+    /// After the user picks a display, SCKit is re-enabled automatically.
+    /// Safe to call from any thread (dispatches to main queue internally).
+    pub fn sc_show_picker();
+}
+
+/// Returns the NSWindow number (z-order ID) of the app's main window.
+#[cfg(target_os = "macos")]
+pub fn get_main_window_id() -> u32 {
+    use objc::{class, msg_send, sel, sel_impl};
+    unsafe {
+        let app: *mut objc::runtime::Object =
+            msg_send![class!(NSApplication), sharedApplication];
+        let win: *mut objc::runtime::Object = msg_send![app, mainWindow];
+        if win.is_null() {
+            return 0;
+        }
+        let num: i64 = msg_send![win, windowNumber];
+        num as u32
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn capture_screen_region(x: i32, y: i32, w: u32, h: u32, exclude_window_id: u32) -> Result<Vec<u8>, String> {
+    // Log every capture (rate-limited to once per 60 frames to avoid flooding).
+    static CGWL_OK_COUNT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+    let n = CGWL_OK_COUNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let should_log = n < 5 || n % 60 == 0;
+    if should_log {
+        let has_perm = unsafe { macos_ffi::CGPreflightScreenCaptureAccess() };
+        crate::write_log(&format!("capture[{}] perm(old-TCC)={} rect=({},{},{},{}) excl={}",
+            n, has_perm, x, y, w, h, exclude_window_id));
     }
 
-    Ok(buf)
+    let mut actual_w: u32 = 0;
+    let mut actual_h: u32 = 0;
+
+    let ptr = unsafe {
+        sc_capture_rect_rgba(
+            x as f64, y as f64, w as f64, h as f64,
+            exclude_window_id,
+            &mut actual_w, &mut actual_h,
+        )
+    };
+
+    if ptr.is_null() {
+        crate::write_log("SCKit: sc_capture_rect_rgba returned NULL (not authorized? Use tray menu to grant permission)");
+        return Err("SCKit capture returned NULL — use tray menu to grant Screen Recording permission".into());
+    }
+
+    if should_log {
+        crate::write_log(&format!("capture[{}]: OK actual={}x{} logical={}x{}", n, actual_w, actual_h, w, h));
+    }
+
+    // Wrap the malloc'd buffer in a Vec for safe handling.
+    let byte_len = (actual_w * actual_h * 4) as usize;
+    let buf: Vec<u8> = unsafe {
+        let slice = std::slice::from_raw_parts(ptr, byte_len);
+        let v = slice.to_vec();
+        sc_free_buffer(ptr);
+        v
+    };
+
+    // Retina: scale physical pixels down to logical size if needed.
+    if actual_w == w && actual_h == h {
+        return Ok(buf);
+    }
+    let img = image::ImageBuffer::<image::Rgba<u8>, Vec<u8>>::from_raw(actual_w, actual_h, buf)
+        .ok_or("macOS CGWL: failed to create ImageBuffer for scaling")?;
+    let scaled = image::imageops::resize(&img, w, h, image::imageops::FilterType::Nearest);
+    Ok(scaled.into_raw())
 }
 
 #[cfg(target_os = "linux")]
-fn capture_screen_region(x: i32, y: i32, w: u32, h: u32) -> Result<Vec<u8>, String> {
+fn capture_screen_region(x: i32, y: i32, w: u32, h: u32, _exclude_window_id: u32) -> Result<Vec<u8>, String> {
     use x11rb::connection::Connection;
     use x11rb::protocol::xproto::{ConnectionExt, ImageFormat};
     use x11rb::rust_connection::RustConnection;
@@ -237,6 +333,6 @@ fn capture_screen_region(x: i32, y: i32, w: u32, h: u32) -> Result<Vec<u8>, Stri
 }
 
 #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
-fn capture_screen_region(_x: i32, _y: i32, _w: u32, _h: u32) -> Result<Vec<u8>, String> {
+fn capture_screen_region(_x: i32, _y: i32, _w: u32, _h: u32, _exclude_window_id: u32) -> Result<Vec<u8>, String> {
     Err("Unsupported platform".into())
 }

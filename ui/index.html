@@ -10,8 +10,8 @@
   <div id="app">
 
     <!-- Header -->
-    <header class="app-header">
-      <span class="app-title" data-tauri-drag-region>PixelLens</span>
+    <header class="app-header" data-tauri-drag-region>
+      <span class="app-title">PixelLens</span>
       <div class="header-actions">
         <button class="icon-btn" id="btn-settings" data-i18n-title="settings" aria-label="Settings">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -80,6 +80,7 @@
           <line x1="12" y1="16" x2="12.01" y2="16"/>
         </svg>
         <span id="permission-warning-text">Screen recording permission required.</span>
+        <button id="permission-grant-btn" class="perm-grant-btn">Grant Permission</button>
       </div>
 
     </main>
@@ -184,6 +185,6 @@
     }
   })();
   </script>
-  <script src="app.js?v=9" onerror="document.getElementById('coord-display').textContent='APP-JS-LOAD-ERR'"></script>
+  <script src="app.js?v=11" onerror="document.getElementById('coord-display').textContent='APP-JS-LOAD-ERR'"></script>
 </body>
 </html>

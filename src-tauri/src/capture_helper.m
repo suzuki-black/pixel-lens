@@ -52,10 +52,11 @@ static NSLock*            g_sample_lock     = nil;
 static dispatch_queue_t   g_sample_queue    = nil;
 
 /// Display geometry stored at stream-start time.
-/// logical_h: CG logical height (for Y-flip from CG coords to buffer coords).
-/// scale:     backingScaleFactor (logical → physical pixel conversion).
-static double g_display_logical_h = 0.0;
-static double g_display_scale     = 1.0;
+/// scale: backingScaleFactor (logical → physical pixel conversion).
+/// Note: NO Y-flip is applied. CGEvent.location() returns coordinates with
+/// origin at the TOP-LEFT (y increases downward), which is the same as the
+/// SCStream pixel buffer layout. Direct mapping: buf_x = x*scale, buf_y = y*scale.
+static double g_display_scale = 1.0;
 
 /// Suppresses repeated "not authorized" log messages.
 static BOOL g_no_auth_logged = NO;
@@ -163,8 +164,7 @@ static PLStreamDelegate* g_stream_delegate = nil;
     if (!g_stream_output)  g_stream_output  = [[PLStreamOutput alloc] init];
     if (!g_stream_delegate) g_stream_delegate = [[PLStreamDelegate alloc] init];
 
-    g_display_logical_h = logH;
-    g_display_scale     = scale;
+    g_display_scale = scale;
     g_no_auth_logged    = NO;
 
     // Create the stream.
@@ -196,8 +196,8 @@ static PLStreamDelegate* g_stream_delegate = nil;
             }
         } else {
             g_stream_started = YES;
-            pl_log("Stream: started OK buf=%zux%zu logH=%.0f scale=%.1f",
-                   physW, physH, logH, scale);
+            pl_log("Stream: started OK buf=%zux%zu scale=%.1f",
+                   physW, physH, scale);
         }
     }];
 }
@@ -291,25 +291,19 @@ static CGImageRef try_sckit_capture(double x, double y, double w, double h)
     size_t   bytesPerRow = CVPixelBufferGetBytesPerRow(imgBuf);
     uint8_t* baseAddr    = (uint8_t*)CVPixelBufferGetBaseAddress(imgBuf);
 
-    // --- Coordinate mapping: CG logical → buffer pixel ---
+    // --- Coordinate mapping: logical cursor coords → buffer pixels ---
     //
-    // CG coordinate system: origin at BOTTOM-LEFT, y increases upward.
-    // Buffer coordinate system: origin at TOP-LEFT, y increases downward.
+    // CGEvent.location() returns coordinates with origin at the TOP-LEFT of
+    // the main display, y increasing DOWNWARD (same convention as the SCStream
+    // pixel buffer).  Therefore NO Y-flip is needed — it's a direct scale:
     //
-    // Given:
-    //   logH  = logical display height (stored at stream-start)
-    //   scale = backingScaleFactor
-    //   (x, y, w, h) in CG logical coords where y is the BOTTOM of the rect
-    //
-    // Buffer pixel of the TOP-LEFT of the capture rect:
     //   buf_x = x * scale
-    //   buf_y = (logH - y - h) * scale       ← Y-flip
+    //   buf_y = y * scale
     //
-    double logH  = (g_display_logical_h > 0) ? g_display_logical_h : (double)bufH;
-    double scale = (g_display_scale     > 0) ? g_display_scale     : 1.0;
+    double scale = (g_display_scale > 0) ? g_display_scale : 1.0;
 
     double buf_x_f = x * scale;
-    double buf_y_f = (logH - y - h) * scale;   // Y-flip
+    double buf_y_f = y * scale;   // No Y-flip — same top-left origin as buffer
     double buf_w_f = w * scale;
     double buf_h_f = h * scale;
 
@@ -325,9 +319,9 @@ static CGImageRef try_sckit_capture(double x, double y, double w, double h)
     if (bx + bw > bufW) bw = bufW - bx;
     if (by + bh > bufH) bh = bufH - by;
 
-    pl_log("SCKit: buf=%zux%zu scale=%.1f logH=%.0f "
-           "CG=(%.0f,%.0f,%.0f,%.0f) → crop=(%zu,%zu,%zu,%zu)",
-           bufW, bufH, scale, logH, x, y, w, h, bx, by, bw, bh);
+    pl_log("SCKit: buf=%zux%zu scale=%.1f "
+           "logical=(%.0f,%.0f,%.0f,%.0f) → crop=(%zu,%zu,%zu,%zu)",
+           bufW, bufH, scale, x, y, w, h, bx, by, bw, bh);
 
     if (bw == 0 || bh == 0) {
         pl_log("SCKit: crop region empty after clamping");

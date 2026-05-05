@@ -5,5 +5,8 @@
     <!-- Required since macOS 14 (Sonoma) for ScreenCaptureKit APIs -->
     <key>NSScreenCaptureUsageDescription</key>
     <string>PixelLens needs screen recording access to show you the pixel color under your cursor.</string>
+    <!-- Hide from Dock and Cmd+Tab — PixelLens is a menu bar utility -->
+    <key>LSUIElement</key>
+    <true/>
 </dict>
 </plist>

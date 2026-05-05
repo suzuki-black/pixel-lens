@@ -5,5 +5,11 @@
     <!-- Allow loading dylibs not signed by Apple (needed for Tauri's injected dylibs) -->
     <key>com.apple.security.cs.disable-library-validation</key>
     <true/>
+    <!-- Required for ScreenCaptureKit / SCContentSharingPicker to register with
+         macOS TCC (System Settings → Screen Recording).
+         Without this entitlement the app never appears in the list even after
+         the user grants permission via the picker. -->
+    <key>com.apple.security.screen-recording</key>
+    <true/>
 </dict>
 </plist>

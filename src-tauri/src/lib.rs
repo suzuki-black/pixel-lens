@@ -263,6 +263,18 @@ pub struct PixelData {
 
 // ── App entry point ──────────────────────────────────────────────────────────
 
+// macOS native tray: store AppHandle globally so the C callback can access it.
+#[cfg(target_os = "macos")]
+static APP_HANDLE_FOR_TRAY: std::sync::OnceLock<tauri::AppHandle> = std::sync::OnceLock::new();
+
+/// C-compatible callback invoked by ObjC on left-click of the native tray icon.
+#[cfg(target_os = "macos")]
+extern "C" fn tray_toggle_window_cb() {
+    if let Some(h) = APP_HANDLE_FOR_TRAY.get() {
+        toggle_window(h);
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     init_log();
@@ -294,7 +306,14 @@ pub fn run() {
             let saved = load_settings_from_disk(app);
             *app.state::<AppState>().settings.lock().unwrap() = saved;
 
-            #[cfg(not(target_os = "linux"))]
+            // macOS: use native NSStatusItem (Tauri tray API broken on macOS 26)
+            #[cfg(target_os = "macos")]
+            {
+                APP_HANDLE_FOR_TRAY.set(app.handle().clone()).ok();
+                unsafe { capture::sc_setup_native_tray(tray_toggle_window_cb) };
+            }
+            // Windows / other non-Linux: use Tauri tray
+            #[cfg(all(not(target_os = "linux"), not(target_os = "macos")))]
             setup_tray(app)?;
             setup_shortcut(app)?;
             log!("setup: shortcut registered");
@@ -368,56 +387,65 @@ pub fn run() {
 
 #[cfg(not(target_os = "linux"))]
 fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
-    use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
     use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 
-    let quit_item = MenuItem::with_id(app, "quit", "PixelLens を終了", true, None::<&str>)?;
-
-    // macOS 26: SCContentSharingPicker is the ONLY way to grant screen capture auth.
-    // Provide a tray menu item so the user can trigger the picker at any time.
+    // ── macOS ────────────────────────────────────────────────────────────────
+    // On macOS, setting NSStatusItem.menu causes BOTH left and right clicks to
+    // open the menu — left-click toggle is impossible via Tauri's menu API.
+    // Fix: don't attach a Tauri menu at all. Handle clicks in on_tray_icon_event:
+    //   • Left click  → toggle window
+    //   • Right click → sc_show_context_menu() builds a native NSMenu in ObjC
     #[cfg(target_os = "macos")]
-    let perm_item = MenuItem::with_id(
-        app,
-        "grant_permission",
-        "画面収録を許可（クリックして選択）",
-        true,
-        None::<&str>,
-    )?;
+    {
+        let _tray = TrayIconBuilder::new()
+            .icon(app.default_window_icon().unwrap().clone())
+            .tooltip("PixelLens — 左クリックで表示/非表示")
+            .on_tray_icon_event(|tray, event| {
+                if let TrayIconEvent::Click { button, button_state: MouseButtonState::Up, .. } = event {
+                    match button {
+                        MouseButton::Left => {
+                            log!("tray: left click → toggle_window");
+                            toggle_window(tray.app_handle());
+                        }
+                        MouseButton::Right => {
+                            log!("tray: right click → sc_show_context_menu");
+                            unsafe { capture::sc_show_context_menu() };
+                        }
+                        _ => {}
+                    }
+                }
+            })
+            .build(app)?;
+    }
 
-    #[cfg(target_os = "macos")]
-    let sep = PredefinedMenuItem::separator(app)?;
-
-    #[cfg(target_os = "macos")]
-    let menu = Menu::with_items(app, &[&perm_item, &sep, &quit_item])?;
-
+    // ── Windows / other non-Linux ────────────────────────────────────────────
+    // On Windows the menu works correctly with show_menu_on_left_click(false).
     #[cfg(not(target_os = "macos"))]
-    let menu = Menu::with_items(app, &[&quit_item])?;
+    {
+        use tauri::menu::{Menu, MenuItem};
+        let quit_item = MenuItem::with_id(app, "quit", "PixelLens を終了", true, None::<&str>)?;
+        let menu = Menu::with_items(app, &[&quit_item])?;
 
-    let _tray = TrayIconBuilder::new()
-        .icon(app.default_window_icon().unwrap().clone())
-        .menu(&menu)
-        .show_menu_on_left_click(false)
-        .tooltip("PixelLens — 左クリックで表示/非表示")
-        .on_menu_event(|app, event| match event.id.as_ref() {
-            "quit" => app.exit(0),
-            #[cfg(target_os = "macos")]
-            "grant_permission" => {
-                log!("tray: grant_permission clicked — presenting SCContentSharingPicker");
-                unsafe { capture::sc_show_picker() };
-            }
-            _ => {}
-        })
-        .on_tray_icon_event(|tray, event| {
-            if let TrayIconEvent::Click {
-                button: MouseButton::Left,
-                button_state: MouseButtonState::Up,
-                ..
-            } = event
-            {
-                toggle_window(tray.app_handle());
-            }
-        })
-        .build(app)?;
+        let _tray = TrayIconBuilder::new()
+            .icon(app.default_window_icon().unwrap().clone())
+            .menu(&menu)
+            .show_menu_on_left_click(false)
+            .tooltip("PixelLens — 左クリックで表示/非表示")
+            .on_menu_event(|app, event| match event.id.as_ref() {
+                "quit" => app.exit(0),
+                _ => {}
+            })
+            .on_tray_icon_event(|tray, event| {
+                if let TrayIconEvent::Click {
+                    button: MouseButton::Left,
+                    button_state: MouseButtonState::Up,
+                    ..
+                } = event {
+                    toggle_window(tray.app_handle());
+                }
+            })
+            .build(app)?;
+    }
 
     Ok(())
 }

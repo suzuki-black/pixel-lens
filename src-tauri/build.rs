@@ -4,6 +4,10 @@ fn main() {
     // On macOS: compile the ScreenCaptureKit ObjC shim and link required frameworks.
     #[cfg(target_os = "macos")]
     {
+        // Explicitly tell cargo to rerun this build script when the ObjC source changes.
+        // The cc crate's automatic rerun-if-changed is unreliable (uses compiler hash, not file content).
+        println!("cargo:rerun-if-changed=src/capture_helper.m");
+
         cc::Build::new()
             .file("src/capture_helper.m")
             .flag("-fobjc-arc")

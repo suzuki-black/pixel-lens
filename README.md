@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 [![Tauri v2](https://img.shields.io/badge/Tauri-v2-24C8D8?logo=tauri&logoColor=white)](https://tauri.app)
 [![Rust](https://img.shields.io/badge/Rust-stable-orange?logo=rust&logoColor=white)](https://www.rust-lang.org)
-[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20(untested)-blue)](#platform-status)
+[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS-blue)](#platform-status)
 
 ---
 
@@ -87,6 +87,23 @@ npm run build
 
 Output: `src-tauri/target/release/pixel-lens` (or `.exe` on Windows).
 
+#### macOS — install.sh
+
+On macOS, Tauri's adhoc build does not embed entitlements into the binary.  
+Use the provided script to build, install, and re-sign in one step:
+
+```bash
+./install.sh
+```
+
+This script:
+1. Runs `npx tauri build`
+2. Copies the app to `/Applications/PixelLens.app`
+3. Re-signs with `entitlements.plist` (`com.apple.security.screen-recording`)
+4. Resets the TCC cache for PixelLens only
+
+On first launch, PixelLens automatically shows the **Screen Recording picker** (SCContentSharingPicker) after 2 seconds. Select your display to grant permission.
+
 ---
 
 ## Usage
@@ -95,16 +112,16 @@ Output: `src-tauri/target/release/pixel-lens` (or `.exe` on Windows).
 2. Move your mouse over any pixel to see the color update in real time.
 3. Click a copy button or press **Ctrl+Shift+C** to copy the color.
 4. Click **—** or press **Ctrl+Alt+C** to hide the window to the tray.
-5. To quit, **right-click the tray icon → Quit**.
+5. To quit, **click the tray icon → PixelLens を終了**.
 
 ---
 
 ## Keyboard Shortcuts
 
-| Action | Windows | macOS (planned) |
+| Action | Windows | macOS |
 |---|---|---|
-| Show / Hide window | `Ctrl + Alt + C` | `Cmd + Option + C` |
-| Quick copy current color | `Ctrl + Shift + C` | `Cmd + Shift + C` |
+| Show / Hide window | `Ctrl + Alt + C` | `Ctrl + Alt + C` |
+| Quick copy current color | `Ctrl + Shift + C` | `Ctrl + Shift + C` |
 
 > Shortcuts are global — they work even when PixelLens is hidden or another app is active.
 
@@ -131,8 +148,8 @@ Output: `src-tauri/target/release/pixel-lens` (or `.exe` on Windows).
 | Platform | Status | Notes |
 |---|---|---|
 | **Windows 10 / 11** | ✅ Verified | Primary development target |
-| **macOS** | ⚠️ Unverified | Implemented but untested due to hardware shortage. Bug reports welcome. |
-| **Linux (X11 / Wayland)** | 🚧 Partial | X11 capture fails on WSL2/Xwayland; planned for v0.5 |
+| **macOS 14+** | ✅ Verified | Confirmed working on macOS 26. Uses ScreenCaptureKit (SCStream) with SCContentSharingPicker for screen recording authorization. Menu-bar-only app (no Dock icon). |
+| **Linux (X11 / Wayland)** | 🚧 Partial | X11 capture implemented; Wayland not yet supported. Planned for v0.5. |
 
 ---
 
@@ -144,7 +161,7 @@ Output: `src-tauri/target/release/pixel-lens` (or `.exe` on Windows).
 | App shell | Tauri v2 (Rust) |
 | Renderer | WebView2 (Windows) / WKWebView (macOS) |
 | Color difference | CIE76 ΔE |
-| Screen capture | Win32 GDI BitBlt (Windows) / CGDisplay (macOS) |
+| Screen capture | Win32 GDI BitBlt (Windows) / ScreenCaptureKit SCStream (macOS) / x11rb (Linux) |
 | Color dictionary | JIS Z 8102 + Web colors, 90 entries |
 
 ---
@@ -164,8 +181,7 @@ Output: `src-tauri/target/release/pixel-lens` (or `.exe` on Windows).
 
 ## Contributing
 
-Bug reports, feature requests, and pull requests are welcome.  
-**macOS compatibility reports** are especially appreciated — we currently have no hardware to test on.
+Bug reports, feature requests, and pull requests are welcome.
 
 ---
 
@@ -233,24 +249,34 @@ npm run build
 | Windows | Visual Studio Build Tools 2022（「C++ によるデスクトップ開発」ワークロード） |
 | macOS | Xcode Command Line Tools |
 
+#### macOS — install.sh
+
+macOS では Tauri の adhoc ビルドが entitlements をバイナリに埋め込まないため、専用スクリプトを使用してください：
+
+```bash
+./install.sh
+```
+
+初回起動後 2 秒で「画面収録」ピッカーが自動表示されます。**ディスプレイ全体**を選択してください。
+
 ---
 
 ## 使い方
 
-1. 起動するとウィンドウが表示され、トレイアイコンが現れます。
+1. 起動するとウィンドウが表示され、メニューバーアイコンが現れます。
 2. マウスを動かすと色がリアルタイム更新されます。
 3. コピーボタンか **Ctrl+Shift+C** で色をコピー。
 4. **—** ボタンか **Ctrl+Alt+C** でウィンドウをトレイに隠す。
-5. 終了は **トレイアイコン右クリック → PixelLens を終了**。
+5. 終了は **メニューバーアイコンをクリック → PixelLens を終了**。
 
 ---
 
 ## キーボードショートカット
 
-| 操作 | Windows | macOS（予定） |
+| 操作 | Windows | macOS |
 |---|---|---|
-| ウィンドウ 表示 / 非表示 | `Ctrl + Alt + C` | `Cmd + Option + C` |
-| クイックコピー | `Ctrl + Shift + C` | `Cmd + Shift + C` |
+| ウィンドウ 表示 / 非表示 | `Ctrl + Alt + C` | `Ctrl + Alt + C` |
+| クイックコピー | `Ctrl + Shift + C` | `Ctrl + Shift + C` |
 
 ---
 
@@ -259,8 +285,8 @@ npm run build
 | 環境 | 状況 | 備考 |
 |---|---|---|
 | **Windows 10 / 11** | ✅ 確認済み | 主要開発・テスト環境 |
-| **macOS** | ⚠️ 未検証 | 機材不足のため未確認。不具合報告歓迎 |
-| **Linux (X11 / Wayland)** | 🚧 未対応 | v0.5 で対応予定 |
+| **macOS 14+** | ✅ 確認済み | macOS 26 で動作確認済み。ScreenCaptureKit (SCStream) 使用。Dock 非表示のメニューバーアプリ。 |
+| **Linux (X11 / Wayland)** | 🚧 未対応 | X11 は実装済み、Wayland は未対応。v0.5 で対応予定。 |
 
 ---
 

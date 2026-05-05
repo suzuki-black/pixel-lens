@@ -21,3 +21,10 @@ dist/
 # Backup files
 ui/app.js.bak
 .claude/
+
+# Tauri auto-generated platform icons (Windows Store / Android / iOS)
+# Only the icons listed in tauri.conf.json are tracked.
+src-tauri/icons/Square*
+src-tauri/icons/StoreLogo.png
+src-tauri/icons/android/
+src-tauri/icons/ios/

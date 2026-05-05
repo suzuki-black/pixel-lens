@@ -185,9 +185,6 @@ extern "C" {
     /// Safe to call from any thread (dispatches to main queue internally).
     pub fn sc_show_picker();
 
-    /// Show the native right-click context menu at the current cursor position.
-    pub fn sc_show_context_menu();
-
     /// Create a native NSStatusItem (bypasses Tauri tray API which breaks on macOS 26).
     /// left_click_cb is called on the main thread when the user left-clicks the tray icon.
     /// Safe to call from any thread (dispatches to main queue internally).

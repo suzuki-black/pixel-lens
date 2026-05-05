@@ -312,8 +312,8 @@ pub fn run() {
                 APP_HANDLE_FOR_TRAY.set(app.handle().clone()).ok();
                 unsafe { capture::sc_setup_native_tray(tray_toggle_window_cb) };
             }
-            // Windows / other non-Linux: use Tauri tray
-            #[cfg(all(not(target_os = "linux"), not(target_os = "macos")))]
+            // Windows (and future non-Linux, non-macOS): use Tauri tray
+            #[cfg(not(any(target_os = "linux", target_os = "macos")))]
             setup_tray(app)?;
             setup_shortcut(app)?;
             log!("setup: shortcut registered");
@@ -385,67 +385,37 @@ pub fn run() {
         .expect("error while running tauri application");
 }
 
-#[cfg(not(target_os = "linux"))]
+// setup_tray is used on Windows (and future non-macOS, non-Linux platforms).
+// macOS uses sc_setup_native_tray (native NSStatusItem) instead — Tauri's
+// TrayIconBuilder is broken on macOS 26 (clicks not delivered without a menu,
+// and attaching a menu prevents left-click toggle).
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
 fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
+    use tauri::menu::{Menu, MenuItem};
     use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 
-    // ── macOS ────────────────────────────────────────────────────────────────
-    // On macOS, setting NSStatusItem.menu causes BOTH left and right clicks to
-    // open the menu — left-click toggle is impossible via Tauri's menu API.
-    // Fix: don't attach a Tauri menu at all. Handle clicks in on_tray_icon_event:
-    //   • Left click  → toggle window
-    //   • Right click → sc_show_context_menu() builds a native NSMenu in ObjC
-    #[cfg(target_os = "macos")]
-    {
-        let _tray = TrayIconBuilder::new()
-            .icon(app.default_window_icon().unwrap().clone())
-            .tooltip("PixelLens — 左クリックで表示/非表示")
-            .on_tray_icon_event(|tray, event| {
-                if let TrayIconEvent::Click { button, button_state: MouseButtonState::Up, .. } = event {
-                    match button {
-                        MouseButton::Left => {
-                            log!("tray: left click → toggle_window");
-                            toggle_window(tray.app_handle());
-                        }
-                        MouseButton::Right => {
-                            log!("tray: right click → sc_show_context_menu");
-                            unsafe { capture::sc_show_context_menu() };
-                        }
-                        _ => {}
-                    }
-                }
-            })
-            .build(app)?;
-    }
+    let quit_item = MenuItem::with_id(app, "quit", "PixelLens を終了", true, None::<&str>)?;
+    let menu = Menu::with_items(app, &[&quit_item])?;
 
-    // ── Windows / other non-Linux ────────────────────────────────────────────
-    // On Windows the menu works correctly with show_menu_on_left_click(false).
-    #[cfg(not(target_os = "macos"))]
-    {
-        use tauri::menu::{Menu, MenuItem};
-        let quit_item = MenuItem::with_id(app, "quit", "PixelLens を終了", true, None::<&str>)?;
-        let menu = Menu::with_items(app, &[&quit_item])?;
-
-        let _tray = TrayIconBuilder::new()
-            .icon(app.default_window_icon().unwrap().clone())
-            .menu(&menu)
-            .show_menu_on_left_click(false)
-            .tooltip("PixelLens — 左クリックで表示/非表示")
-            .on_menu_event(|app, event| match event.id.as_ref() {
-                "quit" => app.exit(0),
-                _ => {}
-            })
-            .on_tray_icon_event(|tray, event| {
-                if let TrayIconEvent::Click {
-                    button: MouseButton::Left,
-                    button_state: MouseButtonState::Up,
-                    ..
-                } = event {
-                    toggle_window(tray.app_handle());
-                }
-            })
-            .build(app)?;
-    }
+    let _tray = TrayIconBuilder::new()
+        .icon(app.default_window_icon().unwrap().clone())
+        .menu(&menu)
+        .show_menu_on_left_click(false)
+        .tooltip("PixelLens — 左クリックで表示/非表示")
+        .on_menu_event(|app, event| match event.id.as_ref() {
+            "quit" => app.exit(0),
+            _ => {}
+        })
+        .on_tray_icon_event(|tray, event| {
+            if let TrayIconEvent::Click {
+                button: MouseButton::Left,
+                button_state: MouseButtonState::Up,
+                ..
+            } = event {
+                toggle_window(tray.app_handle());
+            }
+        })
+        .build(app)?;
 
     Ok(())
 }

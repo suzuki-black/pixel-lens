@@ -279,36 +279,6 @@ body {
 .copy-btn:hover  { background: var(--bg-elevated); color: var(--accent); }
 .copy-btn.copied { color: var(--success); }
 
-/* ── Permission Warning ───────────────────────────────────────────────────── */
-.permission-warning {
-  display: flex;
-  align-items: flex-start;
-  gap: 7px;
-  margin: 0 10px 8px;
-  padding: 8px 10px;
-  background: rgba(240, 169, 64, 0.12);
-  border: 1px solid rgba(240, 169, 64, 0.35);
-  border-radius: var(--radius);
-  color: var(--warning);
-  font-size: 10px;
-  line-height: 1.5;
-}
-.permission-warning svg { flex-shrink: 0; margin-top: 1px; }
-.permission-warning.hidden { display: none; }
-.perm-grant-btn {
-  margin-left: auto;
-  flex-shrink: 0;
-  padding: 2px 8px;
-  border-radius: 4px;
-  border: 1px solid rgba(240, 169, 64, 0.6);
-  background: rgba(240, 169, 64, 0.18);
-  color: var(--warning);
-  font-size: 10px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-.perm-grant-btn:hover { background: rgba(240, 169, 64, 0.3); }
-
 /* ── Settings view ────────────────────────────────────────────────────────── */
 #view-settings { overflow: hidden; }
 

@@ -25,9 +25,6 @@ const I18N = {
     copyFail:        'Copy failed',
     settingsSaved:   'Settings saved',
     settingsFailed:  'Failed to save',
-    permWarning:     'Screen recording permission required.',
-    permWarningBtn:  'Grant Permission',
-    permNoCapture:   'Grant screen recording permission',
   },
   ja: {
     settings:        '設定',
@@ -50,9 +47,6 @@ const I18N = {
     copyFail:        'コピー失敗',
     settingsSaved:   '設定を保存しました',
     settingsFailed:  '保存に失敗しました',
-    permWarning:     '画面収録の権限が必要です。',
-    permWarningBtn:  '権限を付与',
-    permNoCapture:   '画面収録を許可してください',
   },
 };
 
@@ -73,12 +67,6 @@ function applyI18n() {
   // Grid button tooltip
   const gridBtn = document.getElementById('btn-toggle-grid');
   if (gridBtn) gridBtn.title = t('gridTooltip');
-  // Permission warning text
-  const permText = document.getElementById('permission-warning-text');
-  if (permText) permText.textContent = t('permWarning');
-  // Permission grant button
-  const permBtn = document.getElementById('permission-grant-btn');
-  if (permBtn) permBtn.textContent = t('permWarningBtn');
   // html lang attribute
   document.documentElement.lang = state.settings.language || 'en';
 }
@@ -208,7 +196,6 @@ const state = {
     shortcut: 'Ctrl+Alt+C', copy_shortcut: 'Ctrl+Shift+C',
     copy_format: 'hex', theme: 'dark', show_grid: true, language: 'en',
   },
-  permissionError: false,
 };
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
@@ -220,7 +207,6 @@ const colorName    = document.getElementById('color-name');
 const colorNameSub = document.getElementById('color-name-sub');
 const valCombined  = document.getElementById('val-combined');
 const toast        = document.getElementById('toast');
-const permWarn     = document.getElementById('permission-warning');
 const gridBtn      = document.getElementById('btn-toggle-grid');
 
 // ── Magnifier rendering ───────────────────────────────────────────────────────
@@ -230,20 +216,6 @@ const CAPTURE_PX  = 21;
 let tickCount        = 0;
 let captureFailCount = 0;
 const CAPTURE_FAIL_MAX = 5;
-
-// Request screen recording permission via SCContentSharingPicker (macOS 26).
-// This is the ONLY way to grant TCC authorization on macOS 26.
-async function requestScreenPermission() {
-  try {
-    await invoke('request_screen_permission');
-    // After picker interaction, reset fail state so polling resumes at full speed.
-    captureFailCount = 0;
-    state.permissionError = false;
-    // The picker result is asynchronous; the tick loop will detect success.
-  } catch (e) {
-    console.error('[PixelLens] request_screen_permission error:', e);
-  }
-}
 
 async function tick() {
   if (!state.running) return;
@@ -265,8 +237,6 @@ async function tick() {
     }
 
     updateColorDisplay(data.color);
-    permWarn.classList.add('hidden');
-    state.permissionError = false;
     captureFailCount = 0;
 
   } catch (err) {
@@ -274,19 +244,8 @@ async function tick() {
     console.error('[PixelLens tick error]', msg);
     captureFailCount++;
 
-    // Detect permission error BEFORE the throttle branch so the warning is
-    // always shown regardless of how many failures have accumulated.
-    const isPermErr = msg.includes('permission') || msg.includes('NULL')
-      || msg.includes('CGDisplay') || msg.includes('access');
-    if (isPermErr && !state.permissionError) {
-      state.permissionError = true;
-      permWarn.classList.remove('hidden');
-    }
-
     if (captureFailCount >= CAPTURE_FAIL_MAX) {
-      coordDisplay.textContent = isPermErr
-        ? t('permNoCapture')
-        : 'Screen capture N/A';
+      coordDisplay.textContent = 'Screen capture N/A';
       setTimeout(tick, 2000);
       return;
     }
@@ -376,13 +335,6 @@ async function quickCopy() {
   } catch (e) {
     showToast(t('copyFail'));
   }
-}
-
-// ── Permission grant button ───────────────────────────────────────────────────
-// Presents SCContentSharingPicker so the user can authorize screen capture.
-const permGrantBtn = document.getElementById('permission-grant-btn');
-if (permGrantBtn) {
-  permGrantBtn.addEventListener('click', () => requestScreenPermission());
 }
 
 // ── Grid toggle (icon button) ─────────────────────────────────────────────────

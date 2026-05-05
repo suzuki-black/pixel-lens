@@ -114,21 +114,6 @@ fn js_log(level: String, msg: String) {
     write_log(&format!("[JS:{}] {}", level, msg));
 }
 
-/// Present SCContentSharingPicker so the user can authorize screen capture on macOS 26.
-/// On older macOS or non-macOS platforms this is a no-op.
-#[tauri::command]
-fn request_screen_permission() {
-    #[cfg(target_os = "macos")]
-    {
-        log!("request_screen_permission: presenting SCContentSharingPicker");
-        unsafe { capture::sc_show_picker() };
-    }
-    #[cfg(not(target_os = "macos"))]
-    {
-        log!("request_screen_permission: no-op on this platform");
-    }
-}
-
 // ── Tauri commands ───────────────────────────────────────────────────────────
 
 #[tauri::command]
@@ -379,7 +364,6 @@ pub fn run() {
             hide_window,
             start_drag,
             js_log,
-            request_screen_permission,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

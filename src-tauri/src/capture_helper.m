@@ -554,21 +554,26 @@ static void (*g_tray_left_click_cb)(void) = NULL;
 
 // ---------------------------------------------------------------------------
 // sc_request_screen_capture_access
-//   1. Call CGRequestScreenCaptureAccess() to register the app in System
-//      Settings → Screen Recording (creates the TCC entry even on denial).
-//   2. After a short delay, auto-show SCContentSharingPicker so the user can
-//      authorize the full-display SCStream without having to click the menu.
+//   After a short delay, auto-show SCContentSharingPicker so the user can
+//   authorize the full-display SCStream without having to click the menu.
+//
+// Note on System Settings → Screen Recording:
+//   SCContentSharingPicker uses a session-based authorization mechanism
+//   that is SEPARATE from the old TCC service (CGPreflightScreenCaptureAccess).
+//   As a result, PixelLens will NOT appear in System Settings → Screen Recording
+//   after picker authorization — this is EXPECTED and NORMAL on macOS 14+.
+//   The app captures correctly without a TCC entry in System Settings.
+//
+// CGRequestScreenCaptureAccess() is called purely for diagnostic logging;
+// it always returns false on macOS 26 (old TCC service is not used by SCKit).
 //
 // Called on a background thread from sc_setup_native_tray.
 // ---------------------------------------------------------------------------
 static void sc_request_screen_capture_access(void) {
-    // CGRequestScreenCaptureAccess registers the app with the TCC daemon
-    // so it appears in System Settings → Screen Recording.
-    // On macOS 15+ this may show a system dialog; on macOS 26 it shows
-    // a prompt that points the user to System Settings.
-    // We call it unconditionally so the bundle-ID → TCC row is created.
+    // Diagnostic only — always false on macOS 26 (SCKit uses picker auth, not old TCC).
     bool granted = CGRequestScreenCaptureAccess();
-    pl_log("CGRequestScreenCaptureAccess: %s", granted ? "granted" : "not granted (will use SCKit picker)");
+    pl_log("CGRequestScreenCaptureAccess(old-TCC): %s (expected false on macOS 26; SCKit uses picker auth)",
+           granted ? "granted" : "not granted");
 
     // After 2 seconds, auto-show the SCContentSharingPicker if the stream
     // is not running yet. This covers the common case where the user launches

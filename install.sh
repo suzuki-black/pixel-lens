@@ -31,13 +31,13 @@ codesign --force --deep --sign - \
 echo "==> 署名確認:"
 codesign --display --xml --entitlements - "$INSTALL_PATH" 2>&1 | grep -A2 "screen-recording" || true
 
-echo "==> TCC (ScreenCapture) のキャッシュをリセット中..."
-tccutil reset ScreenCapture dev.pixellens.pixellens 2>/dev/null || true
-
 echo ""
 echo "✅ インストール完了"
 echo "   /Applications/PixelLens.app"
 echo ""
-echo "  PixelLens を起動してください。"
-echo "  起動後 2 秒で「画面収録」ピッカーが自動表示されます。"
+echo "  PixelLens を再起動してください（既に起動中の場合はトレイメニューから終了 → 再起動）。"
+echo "  初回起動時のみ、起動後 2 秒で「画面収録」ピッカーが自動表示されます。"
 echo "  「ディスプレイ全体」を選択して許可してください。"
+echo ""
+echo "  ※ TCC リセットが必要な場合のみ手動で実行:"
+echo "     tccutil reset ScreenCapture dev.pixellens.pixellens"

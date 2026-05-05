@@ -138,13 +138,14 @@ fn capture_screen_region(x: i32, y: i32, w: u32, h: u32, _exclude_window_id: u32
 }
 
 // ── macOS ─────────────────────────────────────────────────────────────────────
-// Screen capture on macOS uses ScreenCaptureKit (SCKit).
-// On macOS 26, SCKit requires authorization via SCContentSharingPicker.
-// Call sc_show_picker() once (e.g. via tray menu) to present the picker;
-// after the user selects a display, captures succeed via SCKit.
+// Screen capture on macOS uses ScreenCaptureKit (SCKit) via SCStream.
+// Authorization flow (macOS 14+):
+//   SCContentSharingPicker → user selects display → SCStream starts.
+//   This uses a session-based auth mechanism separate from the old TCC service.
+//   PixelLens will NOT appear in System Settings → Screen Recording — this is
+//   expected and normal. Captures work correctly without a TCC entry.
 //
-// CGWindowListCreateImage was removed: it is unavailable in the macOS 26 SDK
-// and only returned the desktop wallpaper (old TCC service cannot be granted).
+// CGWindowListCreateImage was removed: unavailable in the macOS 26 SDK.
 //
 // The ObjC shim in capture_helper.m implements the capture logic and is
 // compiled by build.rs via the `cc` crate.
@@ -180,8 +181,8 @@ extern "C" {
     fn sc_free_buffer(buf: *mut u8);
 
     /// Present SCContentSharingPicker so the user can authorize screen capture.
-    /// On macOS 26, this is the ONLY way to get TCC authorization for SCKit.
-    /// After the user picks a display, SCKit is re-enabled automatically.
+    /// Uses session-based authorization (separate from System Settings TCC list).
+    /// After the user picks a display, SCStream starts automatically.
     /// Safe to call from any thread (dispatches to main queue internally).
     pub fn sc_show_picker();
 

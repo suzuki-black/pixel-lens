@@ -431,6 +431,22 @@ fn setup_shortcut(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>
         }
     })?;
 
+    // Ctrl+Shift+Alt+C — カラーロック（Pick）トグル
+    // カーソルが目的のピクセル上にある状態で押すと色を確定・ロック。
+    // ロック中はコピーボタンがロックした色を返す（カーソル移動の影響を受けない）。
+    // 再度押すとロック解除してリアルタイム表示に戻る。
+    let lock_shortcut = Shortcut::new(
+        Some(Modifiers::CONTROL | Modifiers::SHIFT | Modifiers::ALT),
+        Code::KeyC,
+    );
+    let app_handle3 = app.handle().clone();
+    app.global_shortcut().on_shortcut(lock_shortcut, move |_app, _shortcut, event| {
+        if event.state == ShortcutState::Pressed {
+            log!("shortcut: Ctrl+Shift+Alt+C → toggle-lock");
+            let _ = app_handle3.emit("toggle-lock", ());
+        }
+    })?;
+
     Ok(())
 }
 

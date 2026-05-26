@@ -141,7 +141,7 @@ fn capture_area(
     cy: i32,
     size: u32,
     state: State<AppState>,
-    window: tauri::WebviewWindow,
+    #[allow(unused_variables)] window: tauri::WebviewWindow,
 ) -> Result<PixelData, String> {
     // On macOS: decide whether to exclude the PixelLens window from the capture.
     // When the cursor is *outside* our window we exclude ourselves so we don't

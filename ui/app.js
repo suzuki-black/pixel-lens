@@ -2,6 +2,11 @@
 
 (function () {
 
+// ── Platform detection ────────────────────────────────────────────────────────
+const isMac = navigator.platform.startsWith('Mac') || navigator.userAgent.includes('Mac');
+const mod   = isMac ? '⌘' : 'Ctrl';
+const alt   = isMac ? '⌥' : 'Alt';
+
 // ── i18n ─────────────────────────────────────────────────────────────────────
 const I18N = {
   en: {
@@ -19,7 +24,7 @@ const I18N = {
     language:        'Language',
     quickCopyFormat: 'Quick Copy Format',
     shortcut:        'Shortcut',
-    shortcutHint:    'Customization coming in next version',
+    shortcutHint:    `Show/Hide: ${mod}+${alt}+C  |  Quick copy: ${mod}+Shift+C`,
     gridTooltip:     'Toggle grid',
     copySuccess:     'Copied: ',
     copyFail:        'Copy failed',
@@ -42,7 +47,7 @@ const I18N = {
     language:        '言語',
     quickCopyFormat: 'クイックコピー形式',
     shortcut:        'ショートカット',
-    shortcutHint:    'クリックして変更（次バージョン対応予定）',
+    shortcutHint:    `表示/非表示: ${mod}+${alt}+C  |  クイックコピー: ${mod}+Shift+C`,
     gridTooltip:     'グリッド表示',
     copySuccess:     'コピー: ',
     copyFail:        'コピー失敗',

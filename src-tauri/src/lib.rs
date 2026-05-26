@@ -127,7 +127,7 @@ fn get_cursor_pos() -> Result<cursor::CursorPos, String> {
                     log!("get_cursor_pos -> x=0 y=0 (以降の (0,0) ログは抑制)");
                 }
             } else {
-                log!("get_cursor_pos -> x={} y={}", pos.x, pos.y);
+                // per-tick pos log omitted in production
             }
         }
         Err(e) => log!("get_cursor_pos ERROR: {}", e),
@@ -168,8 +168,6 @@ fn capture_area(
                     cx >= lx0 && cx < lx1 && cy >= ly0 && cy < ly1
                 })
                 .unwrap_or(false);
-            log!("capture_area: cursor=({},{}) scale={} win_pos={:?} win_size={:?} over_self={} stored_id={}",
-                cx, cy, scale, window.outer_position().ok(), window.outer_size().ok(), over_self, stored_id);
             if over_self {
                 0
             } else {
@@ -191,8 +189,6 @@ fn capture_area(
     })?;
     let dict = state.color_dict.lock().unwrap();
     let color = ColorInfo::from_rgb(capture.center_r, capture.center_g, capture.center_b, &dict);
-    log!("capture_area OK center=({},{},{}) hex={}", capture.center_r, capture.center_g, capture.center_b, color.hex);
-
     Ok(PixelData {
         image_b64: capture.image_b64,
         width: capture.width,
@@ -211,17 +207,12 @@ fn get_color_at(r: u8, g: u8, b: u8, state: State<AppState>) -> ColorInfo {
 
 #[tauri::command]
 fn hide_window(window: tauri::WebviewWindow) {
-    log!("hide_window called");
     let _ = window.hide();
 }
 
 #[tauri::command]
 fn start_drag(window: tauri::WebviewWindow) -> Result<(), String> {
-    log!("start_drag called");
-    window.start_dragging().map_err(|e| {
-        log!("start_drag ERROR: {}", e);
-        e.to_string()
-    })
+    window.start_dragging().map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -320,13 +311,6 @@ pub fn run() {
                 log!("setup: showing window");
                 let _ = w.show();
                 let _ = w.set_focus();
-                if let Ok(inner) = w.inner_size() {
-                    log!("window inner_size (Tauri): {}x{}", inner.width, inner.height);
-                }
-                if let Ok(outer) = w.outer_size() {
-                    log!("window outer_size (with WM decorations): {}x{}", outer.width, outer.height);
-                }
-
                 // macOS: cache the CGWindowID of our main window so we can
                 // exclude it from CGWindowListCreateImageFromArray captures.
                 #[cfg(target_os = "macos")]

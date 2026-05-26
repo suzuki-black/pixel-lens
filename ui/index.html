@@ -10,9 +10,21 @@
   <div id="app">
 
     <!-- Header -->
-    <header class="app-header">
-      <span class="app-title" data-tauri-drag-region>PixelLens</span>
+    <header class="app-header" data-tauri-drag-region>
+      <span class="app-title">PixelLens</span>
       <div class="header-actions">
+        <button class="icon-btn" id="btn-lock" data-i18n-title="lock" aria-label="Lock color" aria-pressed="false">
+          <!-- lock-open icon (default: unlocked) -->
+          <svg id="icon-lock-open" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+            <path d="M7 11V7a5 5 0 0 1 9.9-1"/>
+          </svg>
+          <!-- lock-closed icon (shown when locked) -->
+          <svg id="icon-lock-closed" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          </svg>
+        </button>
         <button class="icon-btn" id="btn-settings" data-i18n-title="settings" aria-label="Settings">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="3"/>
@@ -71,16 +83,6 @@
           </button>
         </div>
       </section>
-
-      <!-- Permission warning (macOS) -->
-      <div id="permission-warning" class="permission-warning hidden">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10"/>
-          <line x1="12" y1="8" x2="12" y2="12"/>
-          <line x1="12" y1="16" x2="12.01" y2="16"/>
-        </svg>
-        <span id="permission-warning-text">Screen recording permission required.</span>
-      </div>
 
     </main>
 
@@ -184,6 +186,6 @@
     }
   })();
   </script>
-  <script src="app.js?v=9" onerror="document.getElementById('coord-display').textContent='APP-JS-LOAD-ERR'"></script>
+  <script src="app.js?v=11" onerror="document.getElementById('coord-display').textContent='APP-JS-LOAD-ERR'"></script>
 </body>
 </html>

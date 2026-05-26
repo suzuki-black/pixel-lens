@@ -5,7 +5,9 @@
   "scripts": {
     "tauri": "npx @tauri-apps/cli",
     "dev": "npx @tauri-apps/cli dev",
-    "build": "npx @tauri-apps/cli build"
+    "build": "npx @tauri-apps/cli build --bundles app",
+    "build:dmg": "npx @tauri-apps/cli build",
+    "install:mac": "rm -rf /Applications/PixelLens.app && cp -R src-tauri/target/release/bundle/macos/PixelLens.app /Applications/PixelLens.app && codesign --deep --force --options runtime --entitlements src-tauri/entitlements.plist -s 'Apple Development: suzupc@opal.famille.ne.jp (9YPX4L9Z8U)' /Applications/PixelLens.app"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.0.0"

@@ -101,6 +101,23 @@ body {
 .icon-btn:hover { background: var(--bg-elevated); color: var(--text); }
 .icon-btn.active { color: var(--accent); }
 
+/* Lock button — locked state */
+.icon-btn.locked {
+  color: var(--warning);
+}
+.icon-btn.locked:hover { color: var(--warning); }
+
+/* Magnifier overlay when locked */
+.magnifier-wrapper.locked::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 2px solid var(--warning);
+  border-radius: var(--radius);
+  pointer-events: none;
+  opacity: 0.7;
+}
+
 /* Grid icon button */
 .grid-btn {
   width: 20px;
@@ -278,23 +295,6 @@ body {
 
 .copy-btn:hover  { background: var(--bg-elevated); color: var(--accent); }
 .copy-btn.copied { color: var(--success); }
-
-/* ── Permission Warning ───────────────────────────────────────────────────── */
-.permission-warning {
-  display: flex;
-  align-items: flex-start;
-  gap: 7px;
-  margin: 0 10px 8px;
-  padding: 8px 10px;
-  background: rgba(240, 169, 64, 0.12);
-  border: 1px solid rgba(240, 169, 64, 0.35);
-  border-radius: var(--radius);
-  color: var(--warning);
-  font-size: 10px;
-  line-height: 1.5;
-}
-.permission-warning svg { flex-shrink: 0; margin-top: 1px; }
-.permission-warning.hidden { display: none; }
 
 /* ── Settings view ────────────────────────────────────────────────────────── */
 #view-settings { overflow: hidden; }

@@ -30,7 +30,9 @@ const I18N = {
     copyFail:        'Copy failed',
     settingsSaved:   'Settings saved',
     settingsFailed:  'Failed to save',
-    permWarning:     'Screen recording permission required. Go to System Preferences › Privacy & Security › Screen Recording.',
+    lock:            'Lock color (Ctrl+Shift+Alt+C)',
+    lockOn:          'Locked',
+    lockOff:         'Lock released',
   },
   ja: {
     settings:        '設定',
@@ -53,7 +55,9 @@ const I18N = {
     copyFail:        'コピー失敗',
     settingsSaved:   '設定を保存しました',
     settingsFailed:  '保存に失敗しました',
-    permWarning:     '画面収録の権限が必要です。システム環境設定 › プライバシーとセキュリティ › 画面収録 で許可してください。',
+    lock:            'カラーロック (Ctrl+Shift+Alt+C)',
+    lockOn:          'ロック中',
+    lockOff:         'ロック解除',
   },
 };
 
@@ -74,22 +78,23 @@ function applyI18n() {
   // Grid button tooltip
   const gridBtn = document.getElementById('btn-toggle-grid');
   if (gridBtn) gridBtn.title = t('gridTooltip');
-  // Permission warning text
-  const permText = document.getElementById('permission-warning-text');
-  if (permText) permText.textContent = t('permWarning');
   // html lang attribute
   document.documentElement.lang = state.settings.language || 'en';
 }
 
 // ── Diagnostics ───────────────────────────────────────────────────────────────
 function diag(msg) {
-  const text = '[JS] ' + msg;
+  jlog('INFO', msg);
+}
+
+function jlog(level, msg) {
+  const text = '[JS:' + level + '] ' + msg;
   console.log(text);
   try {
     const _invoke = window.__TAURI_INTERNALS__?.invoke
       || window.__TAURI__?.core?.invoke;
     if (typeof _invoke === 'function') {
-      _invoke('js_log', { level: 'INFO', msg }).catch(() => {});
+      _invoke('js_log', { level, msg }).catch(() => {});
     }
   } catch (_) {}
 }
@@ -197,25 +202,34 @@ const state = {
     nearest_name: '—', nearest_romaji: '—', nearest_en: '—',
     nearest_hex: '#000000', delta_e: 0,
   },
+  // ── Color lock (Pick) ──────────────────────────────────────────────────────
+  // Ctrl+Shift+Alt+C でロック。ロック中はコピー操作がこの色を使う。
+  locked: false,
+  lockedColor: null,   // ColorInfo — ロック時の色情報
+  lockedImage: null,   // HTMLImageElement — ロック時のマグニファイア画像
+  lockedCoords: null,  // {x, y} — ロック時の座標
+  // ──────────────────────────────────────────────────────────────────────────
   settings: {
     zoom_level: 10, use_jis_colors: true,
     shortcut: 'Ctrl+Alt+C', copy_shortcut: 'Ctrl+Shift+C',
     copy_format: 'hex', theme: 'dark', show_grid: true, language: 'en',
   },
-  permissionError: false,
 };
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
-const canvas       = document.getElementById('magnifier-canvas');
-const ctx          = canvas.getContext('2d');
-const coordDisplay = document.getElementById('coord-display');
-const colorSwatch  = document.getElementById('color-swatch');
-const colorName    = document.getElementById('color-name');
-const colorNameSub = document.getElementById('color-name-sub');
-const valCombined  = document.getElementById('val-combined');
-const toast        = document.getElementById('toast');
-const permWarn     = document.getElementById('permission-warning');
-const gridBtn      = document.getElementById('btn-toggle-grid');
+const canvas            = document.getElementById('magnifier-canvas');
+const ctx               = canvas.getContext('2d');
+const coordDisplay      = document.getElementById('coord-display');
+const colorSwatch       = document.getElementById('color-swatch');
+const colorName         = document.getElementById('color-name');
+const colorNameSub      = document.getElementById('color-name-sub');
+const valCombined       = document.getElementById('val-combined');
+const toast             = document.getElementById('toast');
+const gridBtn           = document.getElementById('btn-toggle-grid');
+const lockBtn           = document.getElementById('btn-lock');
+const iconLockOpen      = document.getElementById('icon-lock-open');
+const iconLockClosed    = document.getElementById('icon-lock-closed');
+const magnifierWrapper  = document.querySelector('.magnifier-wrapper');
 
 // ── Magnifier rendering ───────────────────────────────────────────────────────
 const CANVAS_SIZE = 200;
@@ -227,6 +241,12 @@ const CAPTURE_FAIL_MAX = 5;
 
 async function tick() {
   if (!state.running) return;
+
+  // ロック中はキャプチャをスキップ（ロック時の表示を維持）
+  if (state.locked) {
+    state.rafId = requestAnimationFrame(tick);
+    return;
+  }
 
   try {
     if (tickCount < 3) diag('tick#' + tickCount);
@@ -240,13 +260,15 @@ async function tick() {
     if (data.image_b64) {
       const img = await loadImage(`data:image/png;base64,${data.image_b64}`);
       renderMagnifier(img, CAPTURE_PX);
+      // ロック用に最新画像を保持
+      state._lastImage = img;
     } else {
       renderPlaceholder(pos.x, pos.y);
+      state._lastImage = null;
     }
 
     updateColorDisplay(data.color);
-    permWarn.classList.add('hidden');
-    state.permissionError = false;
+    state._lastPos = { x: pos.x, y: pos.y };
     captureFailCount = 0;
 
   } catch (err) {
@@ -255,18 +277,12 @@ async function tick() {
     captureFailCount++;
 
     if (captureFailCount >= CAPTURE_FAIL_MAX) {
-      coordDisplay.textContent = 'Screen capture N/A (WSL2?)';
+      coordDisplay.textContent = 'Screen capture N/A';
       setTimeout(tick, 2000);
       return;
     }
 
     coordDisplay.textContent = `Error: ${msg.substring(0, 60)}`;
-    if (msg.includes('permission') || msg.includes('CGDisplay') || msg.includes('access')) {
-      if (!state.permissionError) {
-        state.permissionError = true;
-        permWarn.classList.remove('hidden');
-      }
-    }
   }
 
   state.rafId = requestAnimationFrame(tick);
@@ -340,9 +356,50 @@ function updateColorDisplay(color) {
   valCombined.textContent = `${color.hex}  |  ${color.r}, ${color.g}, ${color.b}  |  ${nameLabel}`;
 }
 
+// ── Color lock (Pick) ────────────────────────────────────────────────────────
+function applyLockUI(locked) {
+  lockBtn.classList.toggle('locked', locked);
+  lockBtn.setAttribute('aria-pressed', String(locked));
+  lockBtn.title = t('lock');
+  iconLockOpen.style.display   = locked ? 'none'  : '';
+  iconLockClosed.style.display = locked ? ''      : 'none';
+  magnifierWrapper.classList.toggle('locked', locked);
+}
+
+function lockColor() {
+  // 現在表示中の色・画像・座標を保存してロック
+  state.locked      = true;
+  state.lockedColor = { ...state.currentColor };
+  state.lockedImage = state._lastImage || null;
+  state.lockedCoords = state._lastPos  || null;
+  applyLockUI(true);
+  showToast(t('lockOn') + '  ' + state.lockedColor.hex);
+  jlog('INFO', 'lock: ' + state.lockedColor.hex);
+}
+
+function unlockColor() {
+  state.locked      = false;
+  state.lockedColor = null;
+  state.lockedImage = null;
+  state.lockedCoords = null;
+  applyLockUI(false);
+  showToast(t('lockOff'));
+  jlog('INFO', 'unlock');
+}
+
+function toggleLock() {
+  if (state.locked) {
+    unlockColor();
+  } else {
+    lockColor();
+  }
+}
+
 // ── Quick copy ────────────────────────────────────────────────────────────────
 async function quickCopy() {
-  const text = formatColor(state.currentColor, state.settings.copy_format);
+  // ロック中はロックした色を、未ロック時は現在の色を使う
+  const color = state.locked && state.lockedColor ? state.lockedColor : state.currentColor;
+  const text = formatColor(color, state.settings.copy_format);
   try {
     await writeText(text);
     showToast(t('copySuccess') + text);
@@ -365,12 +422,30 @@ document.getElementById('btn-hide').addEventListener('click', () => {
   invoke('hide_window').catch(() => {});
 });
 
+// ── Window dragging (header mousedown) ────────────────────────────────────────
+document.querySelector('.app-header').addEventListener('mousedown', (e) => {
+  jlog('INFO', `header mousedown button=${e.button} target=${e.target.tagName}.${e.target.className}`);
+  // Only drag on left button; skip clicks on header buttons
+  if (e.button !== 0) return;
+  if (e.target.closest('button')) return;
+  jlog('INFO', 'header mousedown → invoking start_drag');
+  invoke('start_drag').then(() => {
+    jlog('INFO', 'start_drag OK');
+  }).catch((err) => {
+    jlog('ERROR', 'start_drag failed: ' + String(err));
+  });
+});
+
 // ── Copy button ───────────────────────────────────────────────────────────────
 document.getElementById('btn-copy-main').addEventListener('click', () => quickCopy());
 
-// ── Global shortcut event (Ctrl+Shift+C) ─────────────────────────────────────
+// ── Lock button (click) ───────────────────────────────────────────────────────
+lockBtn.addEventListener('click', () => toggleLock());
+
+// ── Global shortcut events ────────────────────────────────────────────────────
 if (isTauri && window.__TAURI__?.event?.listen) {
-  window.__TAURI__.event.listen('quick-copy', () => quickCopy());
+  window.__TAURI__.event.listen('quick-copy',   () => quickCopy());
+  window.__TAURI__.event.listen('toggle-lock',  () => toggleLock());
 }
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
